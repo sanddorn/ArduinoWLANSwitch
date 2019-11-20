@@ -3,25 +3,16 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <DNSServer.h>
-#include <EEPROM.h>
+#include "../lib/EEPROM/EEPromStorage.h"
 
-static const byte WiFiPwdLen = 25;
-static const byte APSTANameLen = 20;
 
-struct WiFiEEPromData {
-    bool APSTA;
-    bool PwDReq;
-    bool CapPortal;
-    char APSTAName[APSTANameLen]; // STATION /AP Point Name TO cONNECT, if definded
-    char WiFiPwd[WiFiPwdLen]; // WiFiPAssword, if definded
-    char ConfigValid[3]; //If Config is Vaild, Tag "TK" is required"
-};
-
+#define BLINK_LED D0
 /* hostname for mDNS. Should work at least on windows. Try http://esp8266.local */
 const char *ESPHostname = "ESP";
 
 // DNS server
 const byte DNS_PORT = 53;
+static const char *const ap_name = "EPS8266_Config_WLAN";
 DNSServer dnsServer;
 
 //Conmmon Paramenters
@@ -35,7 +26,6 @@ IPAddress apIP(172, 20, 0, 1);
 IPAddress netMsk(255, 255, 255, 0);
 
 WiFiEEPromData MyWiFiConfig;
-String temp = "";
 
 boolean loadCredentials();
 
@@ -60,9 +50,8 @@ boolean captivePortal();
 void setup() {
     bool ConnectSuccess = false;
     bool CreateSoftAPSucc = false;
-    bool CInitFSSystem = false;
     byte len;
-    pinMode(D0, OUTPUT); // Initialize the BUILTIN_LED1 pin as an output
+    pinMode(BLINK_LED, OUTPUT); // Initialize the BUILTIN_LED1 pin as an output
     Serial.begin(9600);
     Serial.println();
     WiFi.hostname(ESPHostname); // Set the DHCP hostname assigned to ESP station.
@@ -93,25 +82,25 @@ void setup() {
         CreateSoftAPSucc = CreateWifiSoftAP();
         saveCredentials();
         // Blink
-        digitalWrite(D0, LOW); // Pull to LOW _Led ON
+        digitalWrite(BLINK_LED, LOW); // Pull to LOW _Led ON
         delay(500);
-        digitalWrite(D0, HIGH);
+        digitalWrite(BLINK_LED, HIGH);
         delay(500);
-        digitalWrite(D0, LOW); // Pull to LOW _Led ON
+        digitalWrite(BLINK_LED, LOW); // Pull to LOW _Led ON
         delay(500);
-        digitalWrite(D0, HIGH);
+        digitalWrite(BLINK_LED, HIGH);
         delay(500);
-        digitalWrite(D0, LOW); // Pull to LOW _Led ON
+        digitalWrite(BLINK_LED, LOW); // Pull to LOW _Led ON
     }
-    if ((ConnectSuccess or CreateSoftAPSucc) and CInitFSSystem) {
+    if (ConnectSuccess or CreateSoftAPSucc) {
         InitalizeHTTPServer();
         digitalWrite(D0, LOW); // Pull to LOW _Led ON
-        Serial.println("OK");
+        Serial.println("Setup Succes for STA or SoftAP");
     } else {
         Serial.setDebugOutput(true); //Debug Output for WLAN on Serial Interface.
-        Serial.print("Err");
+        Serial.println("No SoftAP or STA could be started. Resetting to default");
         SetDefaultWiFiConfig();
-        CreateSoftAPSucc = CreateWifiSoftAP();
+        CreateWifiSoftAP();
         saveCredentials();
         InitalizeHTTPServer();
     }
@@ -121,24 +110,7 @@ void InitalizeHTTPServer() {
     /* Setup web pages: root, wifi config pages, SO captive portal detectors and not found. */
     server.on("/", handleRoot);
     server.on("/wifi", handleWifi);
-    if (MyWiFiConfig.CapPortal) {
-        server.on("/generate_204",
-                  handleRoot);  //Android captive portal. Maybe not needed. Might be handled by notFound handler.
-    }
-    if (MyWiFiConfig.CapPortal) {
-        server.on("/favicon.ico",
-                  handleRoot);  //Another Android captive portal. Maybe not needed. Might be handled by notFound handler. Checked on Sony Handy
-    }
-    if (MyWiFiConfig.CapPortal) {
-        server.on("/fwlink",
-                  handleRoot);  //Microsoft captive portal. Maybe not needed. Might be handled by notFound handler.
-    }
-    //server.on("/generate_204", handleRoot);  //Android captive portal. Maybe not needed. Might be handled by notFound handler.
-    //server.on("/favicon.ico", handleRoot);    //Another Android captive portal. Maybe not needed. Might be handled by notFound handler. Checked on Sony Handy
-    //server.on("/fwlink", handleRoot);   //Microsoft captive portal. Maybe not needed. Might be handled by notFound handler.
     server.onNotFound(handleNotFound);
-    // Speicherung Header-Elemente anfordern
-    // server.collectHeaders(Headers, sizeof(Headers)/ sizeof(Headers[0]));
     server.begin(); // Web server start
 }
 
@@ -205,6 +177,8 @@ byte ConnectWifiAP() {
         } else {
             MDNS.addService("http", "tcp", 80);
         }
+        server.stop();
+        server.begin();
     }
     if (connRes == 4) {
         Serial.println("STA Pwd Err");
@@ -265,7 +239,7 @@ void SetDefaultWiFiConfig() {
     MyWiFiConfig.APSTA = true;
     MyWiFiConfig.PwDReq = true;  // default PW required
     MyWiFiConfig.CapPortal = true;
-    strncpy(MyWiFiConfig.APSTAName, "My_WLANDevice", sizeof(MyWiFiConfig.APSTAName));
+    strncpy(MyWiFiConfig.APSTAName, ap_name, sizeof(MyWiFiConfig.APSTAName));
     len = strlen(MyWiFiConfig.APSTAName);
     MyWiFiConfig.APSTAName[len + 1] = '\0';
     strncpy(MyWiFiConfig.WiFiPwd, "12345678", sizeof(MyWiFiConfig.WiFiPwd)); // no password
@@ -321,27 +295,20 @@ String GetEncryptionType(byte thisType) {
 void handleRoot() {
     //  Main Page:
     // FSInfo fs_info;
-    temp = "";
+    String temp = "";
     //Building Page
     // HTML Header
     server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
     // HTML Content
-    server.send(200, "text/html", temp);   // Speichersparen - Schon mal dem Cleint senden
     temp = "";
-    temp += "<!DOCTYPE HTML><html lang='de'><head><meta charset='UTF-8'><meta name= viewport content='width=device-width, initial-scale=1.0,'>";
-    server.sendContent(temp);
-    temp = "";
+    temp += "<!DOCTYPE HTML><html lang='de'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
     temp += "<style type='text/css'><!-- DIV.container { min-height: 10em; display: table-cell; vertical-align: middle }.button {height:35px; width:90px; font-size:16px}";
-    server.sendContent(temp);
-    temp = "";
     temp += "body {background-color: powderblue;}</style>";
     temp += "<head><title>Captive Portal</title></head>";
     temp += "<h2>Captive Portal</h2>";
     temp += "<body>";
-    server.sendContent(temp);
-    temp = "";
     temp += "<br><table border=2 bgcolor = white width = 500 cellpadding =5 ><caption><p><h3>Sytemlinks:</h2></p></caption>";
     temp += "<tr><th><br>";
     temp += "<a href='/wifi'>WIFI Einstellungen</a><br><br>";
@@ -349,100 +316,47 @@ void handleRoot() {
     // temp += "<footer><p>Programmed and designed by: Tobias Kuch</p><p>Contact information: <a href='mailto:tobias.kuch@googlemail.com'>tobias.kuch@googlemail.com</a>.</p></footer>";
     temp += "</body></html>";
     server.setContentLength(temp.length());
-    server.sendContent(temp);
-    temp = "";
+//    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", temp);   // Speichersparen - Schon mal dem Cleint senden
     server.client().stop(); // Stop is needed because we sent no content length
 }
 
 
 void handleNotFound() {
-    if (captivePortal()) { // If caprive portal redirect instead of displaying the error page.
-        return;
-    }
-
-    temp = "";
-    // HTML Header
-    server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    server.sendHeader("Pragma", "no-cache");
-    server.sendHeader("Expires", "-1");
-    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    // HTML Content
-    temp += "<!DOCTYPE HTML><html lang='de'><head><meta charset='UTF-8'><meta name= viewport content='width=device-width, initial-scale=1.0,'>";
-    temp += "<style type='text/css'><!-- DIV.container { min-height: 10em; display: table-cell; vertical-align: middle }.button {height:35px; width:90px; font-size:16px}";
-    temp += "body {background-color: powderblue;}</style>";
-    temp += "<head><title>File not found</title></head>";
-    temp += "<h2> 404 File Not Found</h2><br>";
-    temp += "<h4>Debug Information:</h4><br>";
-    temp += "<body>";
-    temp += "URI: ";
-    temp += server.uri();
-    temp += "\nMethod: ";
-    temp += (server.method() == HTTP_GET) ? "GET" : "POST";
-    temp += "<br>Arguments: ";
-    temp += server.args();
-    temp += "\n";
-    for (int i = 0; i < server.args(); i++) {
-        temp += " " + server.argName(i) + ": " + server.arg(i) + "\n";
-    }
-    temp += "<br>Server Hostheader: " + server.hostHeader();
-    for (int i = 0; i < server.headers(); i++) {
-        temp += " " + server.headerName(i) + ": " + server.header(i) + "\n<br>";
-    }
-    temp += "</table></form><br><br><table border=2 bgcolor = white width = 500 cellpadding =5 ><caption><p><h2>You may want to browse to:</h2></p></caption>";
-    temp += "<tr><th>";
-    temp += "<a href='/'>Main Page</a><br>";
-    temp += "<a href='/wifi'>WIFI Settings</a><br>";
-    temp += "</th></tr></table><br><br>";
-    //temp += "<footer><p>Programmed and designed by: Tobias Kuch</p><p>Contact information: <a href='mailto:tobias.kuch@googlemail.com'>tobias.kuch@googlemail.com</a>.</p></footer>";
-    temp += "</body></html>";
-    server.send(404, "", temp);
-    server.client().stop(); // Stop is needed because we sent no content length
-    temp = "";
-
+    // Serial.println("Request redirected to captive portal");
+    server.sendHeader("Location", String("http://") + server.client().localIP().toString(), true);
+    server.send(302, "text/plain",
+                "Redirect");
 }
-
-
-/** Redirect to captive portal if we got a request for another domain. Return true in that case so the page handler do not try to handle the request again. */
-boolean captivePortal() {
-    if (!isIp(server.hostHeader()) && server.hostHeader() != (String(ESPHostname) + ".local")) {
-        // Serial.println("Request redirected to captive portal");
-        server.sendHeader("Location", String("http://") + server.client().localIP().toString(), true);
-        server.send(302, "text/plain",
-                    ""); // Empty content inhibits Content-length header so we have to close the socket ourselves.
-        server.client().stop(); // Stop is needed because we sent no content length
-        return true;
-    }
-    return false;
-}
-
 
 /** Wifi config page handler */
 void handleWifi() {
     //  Page: /wifi
     byte i;
     byte len;
-    temp = "";
+    String temp = "";
     // Check for Site Parameters
-    if (server.hasArg("Reboot"))  // Reboot System
-    {
+    // Reboot System
+    if (server.hasArg("Reboot")) {
         temp = "Rebooting System in 5 Seconds..";
-        server.send(200, "text/html", temp);
+        server.send(200, "text/ascii", temp);
         delay(5000);
         server.client().stop();
         WiFi.disconnect();
         delay(1000);
         pinMode(D6, OUTPUT);
         digitalWrite(D6, LOW);
+        return;
     }
-    if (server.hasArg("WiFiMode") and
-        (server.arg("WiFiMode") == "1"))  // STA Station Mode Connect to another WIFI Station
-    {
+    // STA Station Mode Connect to another WIFI Station
+    if (server.hasArg("WiFiMode") and (server.arg("WiFiMode") == "1")) {
+
         // Connect to existing STATION
         if (server.arg("WiFi_Network").length() > 0) {
             Serial.println("STA Mode");
             MyWiFiConfig.APSTA = false; // Access Point or Station Mode - false Station Mode
             temp = "";
-            for (i = 0; i < APSTANameLen; i++) {
+            for (i = 0; i < ACCESSPOINT_NAME_LENGTH; i++) {
                 MyWiFiConfig.APSTAName[i] = 0;
             }
             temp = server.arg("WiFi_Network");
@@ -453,7 +367,7 @@ void handleWifi() {
             //   MyWiFiConfig.APSTAName[len+1] = '\0';
             temp = "";
 
-            for (i = 0; i < WiFiPwdLen; i++) {
+            for (i = 0; i < WIFI_PASSWORD_LENGTH; i++) {
                 MyWiFiConfig.WiFiPwd[i] = 0;
             }
             temp = server.arg("STAWLanPW");
@@ -486,9 +400,8 @@ void handleWifi() {
             digitalWrite(D6, LOW);
             i = ConnectWifiAP();
             delay(700);
-            if (i !=
-                3) // 4: WL_CONNECT_FAILED - Password is incorrect 1: WL_NO_SSID_AVAILin - Configured SSID cannot be reached
-            {
+            // 4: WL_CONNECT_FAILED - Password is incorrect 1: WL_NO_SSID_AVAILin - Configured SSID cannot be reached
+            if (i != 3) {
                 Serial.print("Err STA");
                 Serial.println(i);
                 server.client().stop();
@@ -499,13 +412,12 @@ void handleWifi() {
                 delay(1000);
                 pinMode(D6, OUTPUT);
                 digitalWrite(D6, LOW);
-                return;
             } else {
                 // Safe Config
                 saveCredentials();
                 InitalizeHTTPServer();
-                return;
             }
+            return;
         }
     }
 
@@ -530,7 +442,7 @@ void handleWifi() {
 
             MyWiFiConfig.PwDReq = server.hasArg("PasswordReq");
 
-            for (i = 0; i < APSTANameLen; i++) {
+            for (i = 0; i < ACCESSPOINT_NAME_LENGTH; i++) {
                 MyWiFiConfig.APSTAName[i] = 0;
             }
             temp = server.arg("APPointName");
@@ -540,7 +452,7 @@ void handleWifi() {
             }
             MyWiFiConfig.APSTAName[len + 1] = '\0';
             temp = "";
-            for (i = 0; i < WiFiPwdLen; i++) {
+            for (i = 0; i < WIFI_PASSWORD_LENGTH; i++) {
                 MyWiFiConfig.WiFiPwd[i] = 0;
             }
             temp = server.arg("APPW");
@@ -569,15 +481,10 @@ void handleWifi() {
     server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
-    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
     // HTML Content
-    temp += "<!DOCTYPE HTML><html lang='de'><head><meta charset='UTF-8'><meta name= viewport content='width=device-width, initial-scale=1.0,'>";
-    server.send(200, "text/html", temp);
-    temp = "";
+    temp += "<!DOCTYPE HTML><html lang='de'><head><meta charset='UTF-8'><meta name= viewport content='width=device-width, initial-scale=1.0'>";
     temp += "<style type='text/css'><!-- DIV.container { min-height: 10em; display: table-cell; vertical-align: middle }.button {height:35px; width:90px; font-size:16px}";
     temp += "body {background-color: powderblue;}</style><head><title>Smartes Tuerschild - WiFi Settings</title></head>";
-    server.sendContent(temp);
-    temp = "";
     temp += "<h2>WiFi Einstellungen</h2><body><left>";
     temp += "<table border=2 bgcolor = white width = 500 ><td><h4>Current WiFi Settings: </h4>";
     if (server.client().localIP() == apIP) {
@@ -589,8 +496,6 @@ void handleWifi() {
         temp += "BSSID :  " + WiFi.BSSIDstr() + "<br><br>";
     }
     temp += "</td></table><br>";
-    server.sendContent(temp);
-    temp = "";
     temp += "<form action='/wifi' method='post'>";
     temp += "<table border=2 bgcolor = white width = 500><tr><th><br>";
     if (MyWiFiConfig.APSTA == 1) {
@@ -599,8 +504,6 @@ void handleWifi() {
         temp += "<input type='radio' value='1' name='WiFiMode' checked > WiFi Station Mode<br>";
     }
     temp += "Available WiFi Networks:<table border=2 bgcolor = white ></tr></th><td>Number </td><td>SSID  </td><td>Encryption </td><td>WiFi Strength </td>";
-    server.sendContent(temp);
-    temp = "";
     WiFi.scanDelete();
     int n = WiFi.scanNetworks(false, false); //WiFi.scanNetworks(async, show_hidden)
     if (n > 0) {
@@ -629,74 +532,60 @@ void handleWifi() {
     } else {
         temp += "<option value='No_WiFi_Network'>No WiFiNetwork found !/option>";
     }
-    server.sendContent(temp);
-    temp = "";
     temp += "</select></td></tr></th></tr></th><td>WiFi Password: </td><td>";
     temp += "<input type='text' name='STAWLanPW' maxlength='40' size='40'>";
     temp += "</td></tr></th><br></th></tr></table></table><table border=2 bgcolor = white width = 500 ><tr><th><br>";
-    server.sendContent(temp);
-    temp = "";
     if (MyWiFiConfig.APSTA == true) {
         temp += "<input type='radio' name='WiFiMode' value='2' checked> WiFi Access Point Mode <br>";
     } else {
         temp += "<input type='radio' name='WiFiMode' value='2' > WiFi Access Point Mode <br>";
     }
     temp += "<table border=2 bgcolor = white ></tr></th> <td>WiFi Access Point Name: </td><td>";
-    server.sendContent(temp);
-    temp = "";
     if (MyWiFiConfig.APSTA == true) {
-        temp += "<input type='text' name='APPointName' maxlength='" + String(APSTANameLen - 1) + "' size='30' value='" +
+        temp += "<input type='text' name='APPointName' maxlength='" + String(ACCESSPOINT_NAME_LENGTH - 1) +
+                "' size='30' value='" +
                 String(MyWiFiConfig.APSTAName) + "'></td>";
     } else {
-        temp += "<input type='text' name='APPointName' maxlength='" + String(APSTANameLen - 1) + "' size='30' ></td>";
+        temp += "<input type='text' name='APPointName' maxlength='" + String(ACCESSPOINT_NAME_LENGTH - 1) +
+                "' size='30' ></td>";
     }
-    server.sendContent(temp);
-    temp = "";
     if (MyWiFiConfig.APSTA == true) {
         temp += "</tr></th><td>WiFi Password: </td><td>";
-        temp += "<input type='password' name='APPW' maxlength='" + String(WiFiPwdLen - 1) + "' size='30' value='" +
+        temp += "<input type='password' name='APPW' maxlength='" + String(WIFI_PASSWORD_LENGTH - 1) +
+                "' size='30' value='" +
                 String(MyWiFiConfig.WiFiPwd) + "'> </td>";
         temp += "</tr></th><td>Repeat WiFi Password: </td>";
-        temp += "<td><input type='password' name='APPWRepeat' maxlength='" + String(WiFiPwdLen - 1) +
+        temp += "<td><input type='password' name='APPWRepeat' maxlength='" + String(WIFI_PASSWORD_LENGTH - 1) +
                 "' size='30' value='" + String(MyWiFiConfig.WiFiPwd) + "'> </td>";
     } else {
         temp += "</tr></th><td>WiFi Password: </td><td>";
-        temp += "<input type='password' name='APPW' maxlength='" + String(WiFiPwdLen - 1) + "' size='30'> </td>";
+        temp += "<input type='password' name='APPW' maxlength='" + String(WIFI_PASSWORD_LENGTH - 1) +
+                "' size='30'> </td>";
         temp += "</tr></th><td>Repeat WiFi Password: </td>";
-        temp += "<td><input type='password' name='APPWRepeat' maxlength='" + String(WiFiPwdLen - 1) +
+        temp += "<td><input type='password' name='APPWRepeat' maxlength='" + String(WIFI_PASSWORD_LENGTH - 1) +
                 "' size='30'> </td>";
     }
     temp += "</table>";
-    server.sendContent(temp);
-    temp = "";
     if (MyWiFiConfig.PwDReq) {
         temp += "<input type='checkbox' name='PasswordReq' checked> Password for Login required. ";
     } else {
         temp += "<input type='checkbox' name='PasswordReq' > Password for Login required. ";
     }
-    server.sendContent(temp);
-    temp = "";
     if (MyWiFiConfig.CapPortal) {
         temp += "<input type='checkbox' name='CaptivePortal' checked> Activate Captive Portal";
     } else {
         temp += "<input type='checkbox' name='CaptivePortal' > Activate Captive Portal";
     }
-    server.sendContent(temp);
-    temp = "";
     temp += "<br></tr></th></table><br> <button type='submit' name='Settings' value='1' style='height: 50px; width: 140px' autofocus>Set WiFi Settings</button>";
     temp += "<button type='submit' name='Reboot' value='1' style='height: 50px; width: 200px' >Reboot System</button>";
-    server.sendContent(temp);
-    temp = "";
     temp += "<button type='reset' name='action' value='1' style='height: 50px; width: 100px' >Reset</button></form>";
     temp += "<table border=2 bgcolor = white width = 500 cellpadding =5 ><caption><p><h3>Sytemlinks:</h2></p></caption><tr><th><br>";
-    server.sendContent(temp);
-    temp = "";
     temp += "<a href='/'>Main Page</a><br><br></th></tr></table><br><br>";
     //temp += "<footer><p>Programmed and designed by: Tobias Kuch</p><p>Contact Information: <a href='mailto:tobias.kuch@googlemail.com'>tobias.kuch@googlemail.com</a>.</p></footer>";
     temp += "</body></html>";
-    server.sendContent(temp);
+    server.setContentLength(temp.length());
+    server.send(200, "text/html", temp);
     server.client().stop(); // Stop is needed because we sent no content length
-    temp = "";
 }
 
 #define SD_BUFFER_PIXELS 20
