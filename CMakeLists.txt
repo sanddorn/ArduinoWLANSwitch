@@ -6,7 +6,7 @@
 # The `CMakeListsUser.txt` will not be overwritten by PlatformIO.
 
 cmake_minimum_required(VERSION 3.2)
-project("ESP8266_WLAN_Switch")
+project("ArduinoWLANSwitch")
 
 include(CMakeListsPrivate.txt)
 
@@ -86,4 +86,4 @@ add_custom_target(
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-add_executable(Z_DUMMY_TARGET ${SRC_LIST} lib/EEPROM/EEPromStorage.cpp lib/EEPROM/EEPromStorage.h)
+add_executable(Z_DUMMY_TARGET ${SRC_LIST})
