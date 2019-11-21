@@ -12,7 +12,7 @@ const char *ESPHostname = "ESP";
 
 // DNS server
 const byte DNS_PORT = 53;
-static const char *const ap_name = "EPS8266_Config_WLAN";
+static const char *const ap_name = "ESP8266_Config_WLAN";
 DNSServer dnsServer;
 
 //Conmmon Paramenters
@@ -309,11 +309,9 @@ void handleRoot() {
     temp += "<tr><th><br>";
     temp += "<a href='/wifi'>WIFI Einstellungen</a><br><br>";
     temp += "</th></tr></table><br><br>";
-    // temp += "<footer><p>Programmed and designed by: Tobias Kuch</p><p>Contact information: <a href='mailto:tobias.kuch@googlemail.com'>tobias.kuch@googlemail.com</a>.</p></footer>";
     temp += "</body></html>";
     server.setContentLength(temp.length());
-//    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    server.send(200, "text/html", temp);   // Speichersparen - Schon mal dem Cleint senden
+    server.send(200, "text/html", temp);
     server.client().stop(); // Stop is needed because we sent no content length
 }
 
@@ -328,12 +326,14 @@ void handleNotFound() {
 /** Wifi config page handler */
 void handleWifi() {
     //  Page: /wifi
-    byte i;
-    byte len;
     String temp = "";
     // Check for Site Parameters
     // Reboot System
     if (server.hasArg("Reboot")) {
+        temp = "Rebooting System in 5 Seconds..";
+        server.send(200, "text/plain", temp);
+        delay(5000);
+        server.client().stop();
         doReboot();
         return;
     }
@@ -365,10 +365,11 @@ void handleWifi() {
             temp += "<input type='radio' value='1' name='WiFiMode' checked > WiFi Station Mode<br>";
         }
         temp += "Available WiFi Networks:<table border=2 bgcolor = white ></tr></th><td>Number </td><td>SSID  </td><td>Encryption </td><td>WiFi Strength </td>";
+
         WiFi.scanDelete();
-        int n = WiFi.scanNetworks(false, false); //WiFi.scanNetworks(async, show_hidden)
-        if (n > 0) {
-            for (int j = 0; j < n; j++) {
+        int scannedNetworks  = WiFi.scanNetworks(false, false); //WiFi.scanNetworks(async, show_hidden)
+        if (scannedNetworks > 0) {
+            for (int j = 0; j < scannedNetworks; j++) {
                 temp += "</tr></th>";
                 String Nrb = String(j);
                 temp += "<td>" + Nrb + "</td>";
@@ -386,8 +387,8 @@ void handleWifi() {
             temp += "<td> --- </td>";
         }
         temp += "</table><table border=2 bgcolor = white ></tr></th><td>Connect to WiFi SSID: </td><td><select name='WiFi_Network' >";
-        if (n > 0) {
-            for (int j = 0; j < n; j++) {
+        if (scannedNetworks > 0) {
+            for (int j = 0; j < scannedNetworks; j++) {
                 temp += "<option value='" + WiFi.SSID(j) + "'>" + WiFi.SSID(j) + "</option>";
             }
         } else {
@@ -451,15 +452,10 @@ void handleWifi() {
 }
 
 void doReboot() {
-    String temp = "Rebooting System in 5 Seconds..";
-    server.send(200, "text/ascii", temp);
-    delay(5000);
-    server.client().stop();
     WiFi.disconnect();
     delay(1000);
     pinMode(D6, OUTPUT);
     digitalWrite(D6, LOW);
-    return;
 }
 
 boolean configureWifi() {
@@ -470,7 +466,7 @@ boolean configureWifi() {
 
             // Connect to existing STATION
             if (server.arg("WiFi_Network").length() > 0) {
-                Serial.println("STA Mode");
+                Serial.println("Configuring STA Mode");
                 MyWiFiConfig.APSTA = false; // Access Point or Station Mode - false Station Mode
                 memset(MyWiFiConfig.APSTAName, '\0', ACCESSPOINT_NAME_LENGTH);
 
@@ -497,9 +493,9 @@ boolean configureWifi() {
                 temp += "Connecting to STA Mode in 2 Seconds..<br>";
                 if (saveCredentials()) // Save AP ConfigCongfig
                 {
-                    temp = "Daten des AP Modes erfolgreich gespeichert. Reboot notwendig.";
+                    temp = "Daten des STA Modes erfolgreich gespeichert. ";
                 } else {
-                    temp = "Daten des AP Modes fehlerhaft.";
+                    temp = "Daten des STA Modes fehlerhaft.";
                 }
                 server.send(200, "text/html", temp);
                 server.sendContent(temp);
@@ -517,8 +513,7 @@ boolean configureWifi() {
 
                 // 4: WL_CONNECT_FAILED - Password is incorrect 1: WL_NO_SSID_AVAILin - Configured SSID cannot be reached
                 if ( wifiConnectResult != 3) {
-                    Serial.print("Err STA");
-                    Serial.println(wifiConnectResult);
+                    Serial.printf("Err STA Result: %i", wifiConnectResult);
                     server.client().stop();
                     delay(100);
                     WiFi.setAutoReconnect(false);
@@ -527,6 +522,8 @@ boolean configureWifi() {
                     delay(1000);
                     pinMode(D6, OUTPUT);
                     digitalWrite(D6, LOW);
+                    //                    SetDefaultWiFiConfig();
+                    CreateWifiSoftAP();
                 } else {
                     // Safe Config
                     InitalizeHTTPServer();
@@ -547,7 +544,7 @@ boolean configureWifi() {
 
             if ((apNameLength > 1) and (password == server.arg("APPWRepeat")) and (passwordLength > 7)) {
                 temp = "";
-                Serial.println("APMode");
+                Serial.println("Configuring APMode");
                 MyWiFiConfig.APSTA = true; // Access Point or Sation Mode - true AP Mode
 
                 MyWiFiConfig.CapPortal = server.hasArg("CaptivePortal");
@@ -571,6 +568,14 @@ boolean configureWifi() {
                 } else {
                     temp = "Daten des AP Modes fehlerhaft.";
                 }
+                server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+                server.sendHeader("Pragma", "no-cache");
+                server.sendHeader("Expires", "-1");
+                server.setContentLength(temp.length());
+                server.send(200, "text/plain", temp );
+                Serial.println(temp);
+                doReboot();
+                return false;
             } else if (server.arg("APPW") != server.arg("APPWRepeat")) {
                 temp = "WLAN Passwort nicht gleich. Abgebrochen.";
             } else {
@@ -582,7 +587,8 @@ boolean configureWifi() {
                 server.sendHeader("Pragma", "no-cache");
                 server.sendHeader("Expires", "-1");
                 server.setContentLength(temp.length());
-                server.send(417, "text/ascii", temp );
+                server.send(417, "text/plain", temp );
+                Serial.println(temp);
                 return false;
             }
             // End WifiAP
