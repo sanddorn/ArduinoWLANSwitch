@@ -4,7 +4,8 @@
 #include <ESP8266mDNS.h>
 #include <DNSServer.h>
 #include "../lib/EEPROM/EEPromStorage.h"
-#include "WebFiles.h"
+#include "../lib/HTMLHandler/HTMLHandler.h"
+#include <HTMLHandler.h>
 
 
 #define BLINK_LED D5
@@ -66,7 +67,7 @@ void setup() {
 }
 
 void startWifi() {
-    boolean ConnectSuccess = false;
+    boolean ConnectSuccess;
     byte len;
     WiFi.disconnect();
     /* Function will set currently configured SSID and password of the soft-AP to null values. The parameter  is optional. If set to true it will switch the soft-AP mode off.*/
@@ -191,7 +192,7 @@ boolean loadCredentials() {
 /** Store WLAN credentials to EEPROM */
 
 boolean saveCredentials() {
-    if (MyWiFiConfig.AccessPointMode == true) {
+    if (MyWiFiConfig.AccessPointMode) {
         if (sizeof(String(MyWiFiConfig.WiFiPwd)) < 8) {
             return false;  // Invalid Config
         }
@@ -226,47 +227,6 @@ void SetDefaultWiFiConfig() {
     Serial.println("RstWiFiCrd");
 }
 
-/** Is this an IP? */
-boolean isIp(const String &str) {
-    for (unsigned int i = 0; i < str.length(); i++) {
-        int c = str.charAt(i);
-        if (c != '.' && (c < '0' || c > '9')) {
-            return false;
-        }
-    }
-    return true;
-}
-
-String GetEncryptionType(byte thisType) {
-    String Output = "";
-    // read the encryption type and print out the name:
-    switch (thisType) {
-        case ENC_TYPE_WEP:
-            Output = "WEP";
-            return Output;
-            break;
-        case ENC_TYPE_TKIP:
-            Output = "WPA";
-            return Output;
-            break;
-        case ENC_TYPE_CCMP:
-            Output = "WPA2";
-            return Output;
-            break;
-        case ENC_TYPE_NONE:
-            Output = "None";
-            return Output;
-            break;
-        case ENC_TYPE_AUTO:
-            Output = "Auto";
-            return Output;
-            break;
-        default:
-            Output = "Unknown";
-            return Output;
-    }
-}
-
 void handleRoot() {
     //  Main Page:
     // HTML Header
@@ -274,8 +234,9 @@ void handleRoot() {
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
     // HTML Content
-    server.setContentLength(strlen(MAINPAGE));
-    server.send(200, "text/html", MAINPAGE);
+    const String &webPage = HTMLHandler::getMainPage();
+    server.setContentLength(webPage.length());
+    server.send(200, "text/html", webPage);
 }
 
 
@@ -310,58 +271,20 @@ void handleWifi() {
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
     // HTML Content
-    webPage = WIFIPAGE;
+    HTMLHandler hander;
 
-    if (server.client().localIP() == apIP) {
-        replacement = "<div class='currentMode'>Mode : Soft Access Point (AP)</div>\n";
-        replacement += "<div class='currentInfo'>SSID : " + String(MyWiFiConfig.APSTAName) + "</div>\n";
-
-    } else {
-        replacement = "<div class='currentMode'>Mode : Station (STA)</div>\n";
-        replacement += "<div class='currentInfo'>SSID  :  " + String(MyWiFiConfig.APSTAName) + "</div>\n";
-        replacement += "<div class='currentInfo'>BSSID :  " + WiFi.BSSIDstr() + "</div>\n";
+    hander.setSSID(WiFi.SSID().length() > 0 ? WiFi.SSID() : MyWiFiConfig.APSTAName);
+    if (! MyWiFiConfig.AccessPointMode) {
+        hander.setBSSID(WiFi.BSSIDstr());
     }
-    webPage.replace("<currentWifiSettings/>", replacement);
-
-
-    if (MyWiFiConfig.AccessPointMode == 1) {
-        webPage.replace("<apmode/>", "1");
-    } else {
-        webPage.replace("<apmode/>", "0");
-    }
-
+    hander.wifiSetAPMode(MyWiFiConfig.AccessPointMode);
     WiFi.scanDelete();
     replacement = "";
     int scannedNetworks = WiFi.scanNetworks(); //WiFi.scanNetworks(async, show_hidden)
-    if (scannedNetworks > 0) {
-        for (int j = 0; j < scannedNetworks; j++) {
-            char tmp[160];
-            sprintf(tmp, AVALABLE_NETWORK_PARTIAL, j, WiFi.SSID(j).c_str(),
-                    GetEncryptionType(WiFi.encryptionType(j)).c_str(), WiFi.RSSI(j));
-            replacement += tmp;
-        }
-    } else {
-        char tmp[160];
-        sprintf(tmp, AVALABLE_NETWORK_PARTIAL, 1, "No WLAN found", " --- ", 0);
-        replacement += tmp;
+    for (int j = 0; j < scannedNetworks; j++) {
+        hander.addAvailableNetwork(WiFi.SSID(j), WiFi.encryptionType(j), WiFi.RSSI(j));
     }
-    webPage.replace("<availableNetworks/>", replacement);
-
-    replacement = "";
-    if (scannedNetworks > 0) {
-        for (int j = 0; j < scannedNetworks; j++) {
-            replacement += "<option value='" + WiFi.SSID(j) + "'>" + WiFi.SSID(j) + "</option>";
-            // <networkOtions/>
-        }
-    } else {
-        replacement += "<option value='No_WiFi_Network'>No WiFiNetwork found </option>";
-    }
-    webPage.replace("<networkOtions/>", replacement);
-    if (MyWiFiConfig.AccessPointMode == true) {
-        webPage.replace("ESP8266_Config_WLAN", MyWiFiConfig.APSTAName);
-    } else {
-        webPage.replace("ESP8266_Config_WLAN", "");
-    }
+    webPage = hander.getWifiPage();
     server.setContentLength(webPage.length());
     server.send(200, "text/html", webPage);
 }
