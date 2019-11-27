@@ -15,18 +15,11 @@ class EEPromStorage {
 
 };
 
-
-extern "C" {
-
-
 struct WiFiEEPromData {
-    bool APSTA;
-    bool PwDReq;
-    bool CapPortal;
+    bool AccessPointMode;
     char APSTAName[ACCESSPOINT_NAME_LENGTH]; // STATION /AP Point Name TO cONNECT, if definded
     char WiFiPwd[WIFI_PASSWORD_LENGTH]; // WiFiPAssword, if definded
     char ConfigValid[3]; //If Config is Vaild, Tag "TK" is required"
 };
-}
 
 #endif //ESP8266_WLAN_SCHALTER_EEPROMSTORAGE_H

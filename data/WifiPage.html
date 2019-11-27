@@ -1,0 +1,101 @@
+<!DOCTYPE HTML>
+<html lang='de'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name=viewport content='width=device-width, initial-scale=1.0'>
+    <link rel="stylesheet" href="portal.css">
+    <title>Wifi Switch</title>
+    <script>
+        apmode = <apmode/>;
+
+        function setRadioActive() {
+            if (apmode === 1) {
+                document.getElementById("apmode").setAttribute("checked", "1")
+            } else {
+                document.getElementById("station").setAttribute("checked", "1")
+            }
+        }
+    </script>
+</head>
+<body onload="setRadioActive()">
+<h2>WiFi Einstellungen</h2>
+<div class="currentSettings">
+    <h4>Current WiFi Settings:</h4>
+    <currentWifiSettings/>
+</div>
+<br>
+<form action='/wifi' method='post'>
+    <div class="networks">
+        <div class="heading">
+            <label class="centered">
+                <input type='radio' value='1' name='WiFiMode' id="station">
+            </label> WiFi Station Mode
+        </div>
+        <div class="heading">Available WiFi Networks:</div>
+        <table>
+            <tr>
+                <th>Number</th>
+                <th>SSID</th>
+                <th>Encryption</th>
+                <th>WiFi Strength</th>
+            </tr>
+            <availableNetworks/>
+        </table>
+        <table>
+            <tr>
+                <td>Connect to WiFi SSID:</td>
+                <td><select name='WiFi_Network'>
+                    <networkOtions/>
+                </select></td>
+            </tr>
+            <tr>
+                <td>WiFi Password:</td>
+                <td><label>
+                    <input type='text' name='STAWLanPW' maxlength='40' size='40'>
+                </label></td>
+            </tr>
+        </table>
+    </div>
+    <div class="networks">
+        <div class="heading">
+            <label>
+                <input type='radio' value='2' name='WiFiMode' id="apmode">
+            </label>WiFi Access Point Mode
+        </div>
+        <table>
+            <tr>
+                <td>WiFi Access Point Name:</td>
+                <td><input type='text' name='APPointName' maxlength='19' size='30' value='ESP8266_Config_WLAN'>
+                </td>
+            </tr>
+            <tr>
+                <td>WiFi Password:</td>
+                <td><input type='password' name='APPW' maxlength='24' size='30' value='12345678'></td>
+            </tr>
+            <tr>
+                <td>Repeat WiFi Password:</td>
+                <td><input type='password' name='APPWRepeat' maxlength='24' size='30' value='12345678'></td>
+            </tr>
+        </table>
+        <div>
+            <label>
+                <input type='checkbox' name='PasswordReq' checked>
+            </label> Password for Login required.
+        </div>
+        <div class="buttonbox">
+            <button type='submit' name='Settings' value='1' autofocus>Set WiFi
+                Settings
+            </button>
+            <button type='submit' name='Reboot' value='1'>Reboot System</button>
+            <button type='reset' name='action' value='1'>Reset Inputs</button>
+        </div>
+    </div>
+</form>
+<h3>Sytemlinks:</h3>
+<table class="systemlinks">
+    <tr>
+        <th><a href='/wifi'>WIFI Einstellungen</a></th>
+    </tr>
+</table>
+</body>
+</html>

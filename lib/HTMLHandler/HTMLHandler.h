@@ -1,0 +1,14 @@
+//
+// Created by Nils Bokermann on 27.11.19.
+//
+
+#ifndef ARDUINOWLANSWITCH_HTMLHANDLER_H
+#define ARDUINOWLANSWITCH_HTMLHANDLER_H
+
+
+class HTMLHandler {
+
+};
+
+
+#endif //ARDUINOWLANSWITCH_HTMLHANDLER_H
