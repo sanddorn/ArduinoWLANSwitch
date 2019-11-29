@@ -30,17 +30,17 @@ IPAddress netMsk(255, 255, 255, 0);
 
 WiFiEEPromData MyWiFiConfig;
 
-boolean reconnect;
+bool reconnect;
 
-boolean loadCredentials();
+bool loadCredentials();
 
-boolean CreateWifiSoftAP();
+bool CreateWifiSoftAP();
 
 byte ConnectWifiAP();
 
 void SetDefaultWiFiConfig();
 
-boolean saveCredentials();
+bool saveCredentials();
 
 void InitalizeHTTPServer();
 
@@ -90,7 +90,7 @@ void setup() {
 }
 
 void startWifi() {
-    boolean ConnectSuccess;
+    bool ConnectSuccess;
     byte len;
     WiFi.disconnect();
     /* Function will set currently configured SSID and password of the soft-AP to null values. The parameter  is optional. If set to true it will switch the soft-AP mode off.*/
@@ -133,7 +133,7 @@ void InitalizeHTTPServer() {
     server.begin(); // Web server start
 }
 
-boolean CreateWifiSoftAP() {
+bool CreateWifiSoftAP() {
     Serial.print("SoftAP ");
     Serial.printf("AP Settings: '%s' Passwd: '%s'\n", MyWiFiConfig.APSTAName, MyWiFiConfig.WiFiPwd);
     WiFi.softAPConfig(apIP, apIP, netMsk);
@@ -202,8 +202,8 @@ byte ConnectWifiAP() {
     return connRes;
 }
 
-boolean loadCredentials() {
-    boolean retValue;
+bool loadCredentials() {
+    bool retValue;
     EEPROM.begin(512);
     EEPROM.get(0, MyWiFiConfig);
     EEPROM.end();
@@ -214,7 +214,7 @@ boolean loadCredentials() {
 
 /** Store WLAN credentials to EEPROM */
 
-boolean saveCredentials() {
+bool saveCredentials() {
     if (MyWiFiConfig.AccessPointMode) {
         if (sizeof(String(MyWiFiConfig.WiFiPwd)) < 8) {
             return false;  // Invalid Config
@@ -296,11 +296,12 @@ void handleWifi() {
     // HTML Content
     HTMLHandler hander;
 
-    hander.setSSID(WiFi.SSID().length() > 0 ? WiFi.SSID() : MyWiFiConfig.APSTAName);
-    if (! MyWiFiConfig.AccessPointMode) {
+    hander.setSSID(WiFi.SSID());
+    hander.setAPName(MyWiFiConfig.APSTAName);
+    if (!MyWiFiConfig.AccessPointMode) {
         hander.setBSSID(WiFi.BSSIDstr());
     }
-    hander.wifiSetAPMode(MyWiFiConfig.AccessPointMode);
+    hander.setWiFiAPMode(MyWiFiConfig.AccessPointMode);
     WiFi.scanDelete();
     replacement = "";
     int scannedNetworks = WiFi.scanNetworks(); //WiFi.scanNetworks(async, show_hidden)

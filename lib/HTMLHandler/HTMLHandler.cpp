@@ -3,7 +3,6 @@
 //
 
 #include "HTMLHandler.h"
-#include <DNSServer.h>
 #include <ESP8266WiFi.h>
 
 
@@ -36,7 +35,7 @@ String HTMLHandler::getMainPage() {
     return MAINPAGE;
 }
 
-void HTMLHandler::wifiSetAPMode(boolean isSoftAP) {
+void HTMLHandler::setWiFiAPMode(bool isSoftAP) {
     Serial.printf("setting wifiAPMode: %i\n", isSoftAP);
     wifiAPMode = isSoftAP ? 0 : 1;
     Serial.printf("wifiAPMode is now: %i\n", wifiAPMode);
@@ -49,7 +48,7 @@ void HTMLHandler::setCurrentWifiSettings() {
     } else {
         currentSettings = "<div class='currentMode'>Mode : Station (STA)</div>\n";
     }
-    currentSettings += "<div class='currentInfo'>SSID  :  " + ssid + "</div>\n";
+    currentSettings += "<div class='currentInfo'>SSID  :  " + getAPName() + "</div>\n";
     if (bssid.length() > 0) {
         currentSettings += "<div class='currentInfo'>BSSID :  " + bssid + "</div>\n";
     }
@@ -65,6 +64,10 @@ void HTMLHandler::setAPName(const String &apname) {
 
 void HTMLHandler::setBSSID(const String &bssid) {
     this->bssid = bssid;
+}
+
+String HTMLHandler::getAPName() {
+    return ssid.length()>0 ? ssid : apname;
 }
 
 void HTMLHandler::addAvailableNetwork(const String &ssid, const uint8 encryption, int strength) {
@@ -83,7 +86,7 @@ String HTMLHandler::getWifiPage() {
     String wifipage = WIFIPAGE;
     setCurrentWifiSettings();
     if (wifiAPMode) {
-        wifipage.replace("ESP8266_Config_WLAN", ssid);
+        wifipage.replace("ESP8266_Config_WLAN", apname);
     }
     wifipage.replace("<apmode/>", String(wifiAPMode));
     wifipage.replace("<currentWifiSettings/>", currentSettings);
