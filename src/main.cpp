@@ -1,12 +1,11 @@
 #include <ESP8266WiFi.h>
-#include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <DNSServer.h>
 #include "../lib/EEPROM/EEPromStorage.h"
 #include "../lib/HTMLHandler/HTMLHandler.h"
-#include <HTMLHandler.h>
 #include <ArduinoOTA.h>
+#include <FS.h>
 
 
 #define BLINK_LED D5
@@ -84,6 +83,11 @@ void setup() {
     });
     ArduinoOTA.setPassword("Password");
     ArduinoOTA.begin();
+
+    fs::SPIFFSConfig cfg;
+    cfg.setAutoFormat(false);
+    SPIFFS.setConfig(cfg);
+
     Serial.println("Ready");
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
@@ -315,8 +319,9 @@ void handleWifi() {
 
 
 void handleCss() {
-    server.setContentLength(strlen(PORTAL_CSS));
-    server.send(200, "text/css", PORTAL_CSS);
+    String cssString = HTMLHandler::getCss();
+    server.setContentLength(cssString.length());
+    server.send(200, "text/css", cssString);
 }
 
 void doReboot() {

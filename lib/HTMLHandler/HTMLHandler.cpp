@@ -4,6 +4,7 @@
 
 #include "HTMLHandler.h"
 #include <ESP8266WiFi.h>
+#include <FS.h>
 
 
 static String GetEncryptionType(byte thisType) {
@@ -32,7 +33,36 @@ static String GetEncryptionType(byte thisType) {
 }
 
 String HTMLHandler::getMainPage() {
+    if (SPIFFS.begin()) {
+        File mainpage = SPIFFS.open("/MainPage.html", "r");
+        Serial.printf("SPIFFS.open returned File: %i\n", mainpage.isFile());
+        if (mainpage.isFile() && mainpage.size() > 0) {
+            Serial.printf("Returning Main-file\n");
+            String rv = mainpage.readString();
+            mainpage.close();
+            SPIFFS.end();
+            return rv;
+        }
+        SPIFFS.end();
+    }
     return MAINPAGE;
+}
+
+
+String HTMLHandler::getCss() {
+    String cssString;
+    if (SPIFFS.begin()) {
+        File cssFile = SPIFFS.open("/portal.css", "r");
+        if (cssFile.isFile() && cssFile.size() > 0) {
+            cssString = cssFile.readString();
+            cssFile.close();
+            Serial.printf("CSS-File Read\n");
+        }
+        SPIFFS.end();    } else {
+        cssString = PORTAL_CSS;
+    }
+    return cssString;
+
 }
 
 void HTMLHandler::setWiFiAPMode(bool isSoftAP) {
@@ -67,11 +97,19 @@ void HTMLHandler::setBSSID(const String &bssid) {
 }
 
 String HTMLHandler::getAPName() {
-    return ssid.length()>0 ? ssid : apname;
+    return ssid.length() > 0 ? ssid : apname;
 }
 
 void HTMLHandler::addAvailableNetwork(const String &ssid, const uint8 encryption, int strength) {
-    String newAvalilableNetwork = AVALABLE_NETWORK_PARTIAL;
+    File partial = SPIFFS.open("/AvailableNetwork.partial", "r");
+    String newAvalilableNetwork;
+    if (partial.isFile() && partial.size() > 0) {
+        newAvalilableNetwork = partial.readString();
+        partial.close();
+        Serial.printf("Partial-File Read\n");
+    } else {
+        newAvalilableNetwork = AVALABLE_NETWORK_PARTIAL;
+    }
     newAvalilableNetwork.replace("<number/>", String(noNetwork));
     newAvalilableNetwork.replace("<ssid/>", ssid);
     newAvalilableNetwork.replace("<encryption/>", GetEncryptionType(encryption));
@@ -83,7 +121,15 @@ void HTMLHandler::addAvailableNetwork(const String &ssid, const uint8 encryption
 }
 
 String HTMLHandler::getWifiPage() {
-    String wifipage = WIFIPAGE;
+    String wifipage;
+    File wifiPage = SPIFFS.open("/WifiPage.html", "r");
+    if (wifiPage.isFile() && wifiPage.size() > 0) {
+        wifipage = wifiPage.readString();
+        wifiPage.close();
+        Serial.printf("Wifi-File Read\n");
+    } else {
+        wifipage = WIFIPAGE;
+    }
     setCurrentWifiSettings();
     if (wifiAPMode) {
         wifipage.replace("ESP8266_Config_WLAN", apname);
@@ -100,4 +146,11 @@ String HTMLHandler::getWifiPage() {
 }
 
 HTMLHandler::HTMLHandler() : wifiAPMode(0), noNetwork(0) {
+    bool spiffsStarted = SPIFFS.begin();
+    Serial.printf("SPIFFS started: '%i'\n", spiffsStarted);
 }
+
+HTMLHandler::~HTMLHandler() {
+    SPIFFS.end();
+}
+

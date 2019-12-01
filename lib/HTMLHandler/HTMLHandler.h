@@ -16,8 +16,9 @@
 class HTMLHandler {
 public:
     HTMLHandler();
-    ~HTMLHandler() = default;
+    ~HTMLHandler();
     static String getMainPage();
+    static String getCss();
     String getWifiPage();
     void setWiFiAPMode(bool isSoftAP);
     void addAvailableNetwork(const String  &ssid, uint8 encryption, int strength);
