@@ -9,7 +9,14 @@
 
 
 #define BLINK_LED D5
-#define SWITCH_PORT D1
+#define VALVE_PORT D1
+#define TRIGGER_PORT D2
+
+#define VALVE_OPEN 0
+#define VALVE_CLOSED 1
+
+unsigned char valveState = VALVE_CLOSED;
+int lastTriggerState = LOW;
 /* hostname for mDNS. Should work at least on windows. Try http://esp8266.local */
 const char *ESPHostname = "ESP";
 
@@ -17,6 +24,8 @@ const char *ESPHostname = "ESP";
 const byte DNS_PORT = 53;
 static const char *const ap_name = "ESP8266_Config_WLAN";
 DNSServer dnsServer;
+
+HTMLHandler htmlHandler;
 
 //Conmmon Paramenters
 bool SoftAccOK = false;
@@ -44,6 +53,8 @@ bool saveCredentials();
 
 void InitalizeHTTPServer();
 
+void startWifi();
+
 void handleRoot();
 
 void handleWifi();
@@ -52,16 +63,17 @@ void handleCss();
 
 void handleNotFound();
 
-void configureWifi();
+void handleWifiSetup();
 
-void doReboot();
+void handleOpenValve();
 
-void startWifi();
+void handleCloseValve();
 
 void setup() {
     pinMode(BLINK_LED, OUTPUT); // Initialize the BUILTIN_LED1 pin as an output
-    pinMode(SWITCH_PORT, OUTPUT);
-    digitalWrite(SWITCH_PORT,LOW);
+    pinMode(VALVE_PORT, OUTPUT);
+    pinMode(TRIGGER_PORT, INPUT);
+    digitalWrite(VALVE_PORT, LOW);
     Serial.begin(9600);
     Serial.println("booting");
     WiFi.hostname(ESPHostname); // Set the DHCP hostname assigned to ESP station.
@@ -135,6 +147,10 @@ void InitalizeHTTPServer() {
     /* Setup web pages: root, wifi config pages, SO captive portal detectors and not found. */
     server.on("/", handleRoot);
     server.on("/wifi", handleWifi);
+    server.on("/wifiSetup", handleWifiSetup);
+    server.on("/Valve/Open", handleOpenValve);
+    server.on("/Valve/Close", handleCloseValve);
+    server.on("/Valve", handeValveStatus);
     server.on("/portal.css", handleCss);
     server.onNotFound(handleNotFound);
     server.begin(); // Web server start
@@ -264,67 +280,46 @@ void handleRoot() {
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
     // HTML Content
-    const String &webPage = HTMLHandler::getMainPage();
+    const String &webPage = htmlHandler.getMainPage();
     server.setContentLength(webPage.length());
-    server.send(200, "text/html", webPage);
+    server.send(200, MEDIATYPE_TEXT_HTML, webPage);
 }
 
 
 void handleNotFound() {
     // Serial.println("Request redirected to captive portal");
     server.sendHeader("Location", String("http://") + server.client().localIP().toString(), true);
-    server.send(302, "text/plain",
+    server.send(302, MEDIATYPE_TEXT_PLAIN,
                 "Redirect");
 }
 
 /** Wifi config page handler */
 void handleWifi() {
-    digitalWrite(SWITCH_PORT, HIGH);
-    //  Page: /wifi
     String webPage = "";
-    String replacement = "";
-    // Check for Site Parameters
-    // Reboot System
-    if (server.hasArg("Reboot")) {
-        webPage = "Rebooting System in 5 Seconds..";
-        server.send(200, "text/plain", webPage);
-        delay(5000);
-        server.client().stop();
-        doReboot();
-        return;
-    }
-    if (server.hasArg("WiFiMode")) {
-        configureWifi();
-        return;
-    }
-    // HTML Header
     server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
-    // HTML Content
-    HTMLHandler hander;
 
-    hander.setSSID(WiFi.SSID());
-    hander.setAPName(MyWiFiConfig.APSTAName);
+    htmlHandler.setSSID(WiFi.SSID());
+    htmlHandler.setAPName(MyWiFiConfig.APSTAName);
     if (!MyWiFiConfig.AccessPointMode) {
-        hander.setBSSID(WiFi.BSSIDstr());
+        htmlHandler.setBSSID(WiFi.BSSIDstr());
     }
-    hander.setWiFiAPMode(MyWiFiConfig.AccessPointMode);
+    htmlHandler.setWiFiAPMode(MyWiFiConfig.AccessPointMode);
     WiFi.scanDelete();
-    replacement = "";
     int scannedNetworks = WiFi.scanNetworks(); //WiFi.scanNetworks(async, show_hidden)
     for (int j = 0; j < scannedNetworks; j++) {
-        hander.addAvailableNetwork(WiFi.SSID(j), WiFi.encryptionType(j), WiFi.RSSI(j));
+        htmlHandler.addAvailableNetwork(WiFi.SSID(j), WiFi.encryptionType(j), WiFi.RSSI(j));
     }
-    webPage = hander.getWifiPage();
+    webPage = htmlHandler.getWifiPage();
     server.setContentLength(webPage.length());
-    server.send(200, "text/html", webPage);
-    digitalWrite(SWITCH_PORT, LOW);
+    server.send(200, MEDIATYPE_TEXT_HTML, webPage);
+    htmlHandler.resetWifiPage();
 }
 
 
 void handleCss() {
-    String cssString = HTMLHandler::getCss();
+    String cssString = htmlHandler.getCss();
     server.setContentLength(cssString.length());
     server.send(200, "text/css", cssString);
 }
@@ -336,7 +331,7 @@ void doReboot() {
     digitalWrite(BLINK_LED, LOW);
 }
 
-void configureWifi() {
+void handleWifiSetup() {
     String temp = "";
     // STA Station Mode Connect to another WIFI Station
 
@@ -375,7 +370,7 @@ void configureWifi() {
             } else {
                 temp += "Daten des STA Modes fehlerhaft.";
             }
-            server.send(200, "text/html", temp);
+            server.send(200, MEDIATYPE_TEXT_HTML, temp);
             server.sendContent(temp);
             delay(2000);
             server.client().stop();
@@ -441,7 +436,7 @@ void configureWifi() {
             server.sendHeader("Pragma", "no-cache");
             server.sendHeader("Expires", "-1");
             server.setContentLength(temp.length());
-            server.send(200, "text/plain", temp);
+            server.send(200, MEDIATYPE_TEXT_PLAIN, temp);
             Serial.println(temp);
             reconnect = true;
             return;
@@ -456,12 +451,44 @@ void configureWifi() {
             server.sendHeader("Pragma", "no-cache");
             server.sendHeader("Expires", "-1");
             server.setContentLength(temp.length());
-            server.send(417, "text/plain", temp);
+            server.send(417, MEDIATYPE_TEXT_PLAIN, temp);
             Serial.println(temp);
             return;
         }
         // End WifiAP
     }
+}
+
+void handleOpenValve() {
+    String page = htmlHandler.getSwitch(true);
+    server.setContentLength(page.length());
+    server.send(200, MEDIATYPE_TEXT_HTML, page);
+    valveState = VALVE_OPEN;
+}
+
+void handleCloseValve() {
+    String page = htmlHandler.getSwitch(false);
+    server.setContentLength(page.length());
+    server.send(200, MEDIATYPE_TEXT_HTML, page);
+    valveState = VALVE_CLOSED;
+}
+
+void handleValveStatus() {
+    String page = htmlHandler.getSwitch(valveState == VALVE_OPEN);
+    server.setContentLength(page.length());
+    server.send(200, MEDIATYPE_TEXT_HTML, page);
+}
+
+void checkTrigger() {
+    int triggerSetting = digitalRead(TRIGGER_PORT);
+    // Trigger was used
+    if (triggerSetting != lastTriggerState) {
+        valveState = triggerSetting == HIGH ? VALVE_OPEN : VALVE_CLOSED;
+    }
+}
+
+void setValve() {
+    digitalWrite(VALVE_PORT, valveState == VALVE_OPEN ? HIGH : LOW);
 }
 
 void loop() {
@@ -475,6 +502,8 @@ void loop() {
     //HTTP
     server.handleClient();
     ArduinoOTA.handle();
+    checkTrigger();
+    setValve();
     yield();
 }
 

@@ -33,33 +33,35 @@ static String GetEncryptionType(byte thisType) {
 }
 
 String HTMLHandler::getMainPage() {
-    if (SPIFFS.begin()) {
-        File mainpage = SPIFFS.open("/MainPage.html", "r");
-        Serial.printf("SPIFFS.open returned File: %i\n", mainpage.isFile());
-        if (mainpage.isFile() && mainpage.size() > 0) {
-            Serial.printf("Returning Main-file\n");
-            String rv = mainpage.readString();
-            mainpage.close();
-            SPIFFS.end();
-            return rv;
-        }
+    if (!spiffsStarted)
+        return internalError;
+    String mainpage;
+    File mainpageFile = SPIFFS.open("/MainPage.html", "r");
+    Serial.printf("SPIFFS.open returned File: %i\n", mainpageFile.isFile());
+    if (mainpageFile.isFile() && mainpageFile.size() > 0) {
+        Serial.printf("Returning Main-file\n");
+        mainpage = mainpageFile.readString();
+        mainpageFile.close();
         SPIFFS.end();
+
+    } else {
+        mainpage = internalError;
     }
-    return MAINPAGE;
+    return mainpage;
 }
 
 
 String HTMLHandler::getCss() {
+    if (!spiffsStarted)
+        return internalError;
     String cssString;
-    if (SPIFFS.begin()) {
-        File cssFile = SPIFFS.open("/portal.css", "r");
-        if (cssFile.isFile() && cssFile.size() > 0) {
-            cssString = cssFile.readString();
-            cssFile.close();
-            Serial.printf("CSS-File Read\n");
-        }
-        SPIFFS.end();    } else {
-        cssString = PORTAL_CSS;
+    File cssFile = SPIFFS.open("/portal.css", "r");
+    if (cssFile.isFile() && cssFile.size() > 0) {
+        cssString = cssFile.readString();
+        cssFile.close();
+        Serial.printf("CSS-File Read\n");
+    } else {
+        cssString = "";
     }
     return cssString;
 
@@ -108,7 +110,7 @@ void HTMLHandler::addAvailableNetwork(const String &ssid, const uint8 encryption
         partial.close();
         Serial.printf("Partial-File Read\n");
     } else {
-        newAvalilableNetwork = AVALABLE_NETWORK_PARTIAL;
+        newAvalilableNetwork = internalError;
     }
     newAvalilableNetwork.replace("<number/>", String(noNetwork));
     newAvalilableNetwork.replace("<ssid/>", ssid);
@@ -121,6 +123,8 @@ void HTMLHandler::addAvailableNetwork(const String &ssid, const uint8 encryption
 }
 
 String HTMLHandler::getWifiPage() {
+    if (!spiffsStarted)
+        return internalError;
     String wifipage;
     File wifiPage = SPIFFS.open("/WifiPage.html", "r");
     if (wifiPage.isFile() && wifiPage.size() > 0) {
@@ -128,7 +132,7 @@ String HTMLHandler::getWifiPage() {
         wifiPage.close();
         Serial.printf("Wifi-File Read\n");
     } else {
-        wifipage = WIFIPAGE;
+        wifipage = internalError;
     }
     setCurrentWifiSettings();
     if (wifiAPMode) {
@@ -146,11 +150,41 @@ String HTMLHandler::getWifiPage() {
 }
 
 HTMLHandler::HTMLHandler() : wifiAPMode(0), noNetwork(0) {
-    bool spiffsStarted = SPIFFS.begin();
+    spiffsStarted = SPIFFS.begin();
     Serial.printf("SPIFFS started: '%i'\n", spiffsStarted);
 }
 
 HTMLHandler::~HTMLHandler() {
     SPIFFS.end();
+}
+
+void HTMLHandler::resetWifiPage() {
+    options = "";
+    availableNetworks = "";
+    currentSettings = "";
+    ssid = "";
+    bssid = "";
+    apname = "";
+    noNetwork = 0;
+
+}
+
+String HTMLHandler::getSwitch(bool open) {
+    if (!spiffsStarted)
+        return internalError;
+    String valvepage;
+    File valvePageFile = SPIFFS.open("/Valve.html", "r");
+    if (valvePageFile.isFile() && valvePageFile.size() > 0) {
+        valvepage = valvePageFile.readString();
+        valvePageFile.close();
+        Serial.printf("Wifi-File Read\n");
+    } else {
+        valvepage = internalError;
+    }
+    if (open) {
+        valvepage.replace("&#x274C; The valve is closed", "&#x274E; The valve is open");
+
+    }
+    return valvepage;
 }
 

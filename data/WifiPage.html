@@ -10,21 +10,21 @@
 
         function setRadioActive() {
             if (apmode === 1) {
-                document.getElementById("apmode").setAttribute("checked", "1")
-            } else {
                 document.getElementById("station").setAttribute("checked", "1")
+            } else {
+                document.getElementById("apmode").setAttribute("checked", "1")
             }
         }
     </script>
 </head>
 <body onload="setRadioActive()">
-<h2>WiFi Einstellungen</h2>
+<h2>WiFi Settings</h2>
 <div class="currentSettings">
     <h4>Current WiFi Settings:</h4>
     <currentWifiSettings/>
 </div>
 <br>
-<form action='/wifi' method='post'>
+<form action='/wifiSetup' method='post'>
     <div class="networks">
         <div class="heading">
             <label class="centered">
@@ -86,15 +86,14 @@
             <button type='submit' name='Settings' value='1' autofocus>Set WiFi
                 Settings
             </button>
-            <button type='submit' name='Reboot' value='1'>Reboot System</button>
             <button type='reset' name='action' value='1'>Reset Inputs</button>
         </div>
     </div>
 </form>
-<h3>Sytemlinks:</h3>
+<h3>Links:</h3>
 <table class="systemlinks">
     <tr>
-        <th><a href='/wifi'>WIFI Einstellungen</a></th>
+        <th><a href='/wifi'>WIFI Settings</a></th>
     </tr>
 </table>
 </body>
