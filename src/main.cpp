@@ -9,6 +9,7 @@
 
 
 #define BLINK_LED D5
+#define SWITCH_PORT D1
 /* hostname for mDNS. Should work at least on windows. Try http://esp8266.local */
 const char *ESPHostname = "ESP";
 
@@ -59,6 +60,8 @@ void startWifi();
 
 void setup() {
     pinMode(BLINK_LED, OUTPUT); // Initialize the BUILTIN_LED1 pin as an output
+    pinMode(SWITCH_PORT, OUTPUT);
+    digitalWrite(SWITCH_PORT,LOW);
     Serial.begin(9600);
     Serial.println("booting");
     WiFi.hostname(ESPHostname); // Set the DHCP hostname assigned to ESP station.
@@ -276,6 +279,7 @@ void handleNotFound() {
 
 /** Wifi config page handler */
 void handleWifi() {
+    digitalWrite(SWITCH_PORT, HIGH);
     //  Page: /wifi
     String webPage = "";
     String replacement = "";
@@ -315,6 +319,7 @@ void handleWifi() {
     webPage = hander.getWifiPage();
     server.setContentLength(webPage.length());
     server.send(200, "text/html", webPage);
+    digitalWrite(SWITCH_PORT, LOW);
 }
 
 
