@@ -6,16 +6,15 @@
 #include "../lib/HTMLHandler/HTMLHandler.h"
 #include <ArduinoOTA.h>
 #include <FS.h>
+#include "../lib/ValveHandler/ValveHandler.h"
 
 
 #define BLINK_LED D5
 #define VALVE_PORT D1
 #define TRIGGER_PORT D2
 
-#define VALVE_OPEN 0
-#define VALVE_CLOSED 1
 
-unsigned char valveState = VALVE_CLOSED;
+
 int lastTriggerState = LOW;
 /* hostname for mDNS. Should work at least on windows. Try http://esp8266.local */
 const char *ESPHostname = "ESP";
@@ -26,6 +25,8 @@ static const char *const ap_name = "ESP8266_Config_WLAN";
 DNSServer dnsServer;
 
 HTMLHandler htmlHandler;
+
+ValveHandler valveHandler(VALVE_PORT);
 
 //Conmmon Paramenters
 bool SoftAccOK = false;
@@ -68,6 +69,8 @@ void handleWifiSetup();
 void handleOpenValve();
 
 void handleCloseValve();
+
+void handleValveStatus();
 
 void setup() {
     pinMode(BLINK_LED, OUTPUT); // Initialize the BUILTIN_LED1 pin as an output
@@ -150,7 +153,7 @@ void InitalizeHTTPServer() {
     server.on("/wifiSetup", handleWifiSetup);
     server.on("/Valve/Open", handleOpenValve);
     server.on("/Valve/Close", handleCloseValve);
-    server.on("/Valve", handeValveStatus);
+    server.on("/Valve", handleValveStatus);
     server.on("/portal.css", handleCss);
     server.onNotFound(handleNotFound);
     server.begin(); // Web server start
@@ -280,7 +283,7 @@ void handleRoot() {
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
     // HTML Content
-    const String &webPage = htmlHandler.getMainPage();
+    const String &webPage = htmlHandler.getMainPage().c_str();
     server.setContentLength(webPage.length());
     server.send(200, MEDIATYPE_TEXT_HTML, webPage);
 }
@@ -300,18 +303,18 @@ void handleWifi() {
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
 
-    htmlHandler.setSSID(WiFi.SSID());
+    htmlHandler.setSSID(WiFi.SSID().c_str());
     htmlHandler.setAPName(MyWiFiConfig.APSTAName);
     if (!MyWiFiConfig.AccessPointMode) {
-        htmlHandler.setBSSID(WiFi.BSSIDstr());
+        htmlHandler.setBSSID(WiFi.BSSIDstr().c_str());
     }
     htmlHandler.setWiFiAPMode(MyWiFiConfig.AccessPointMode);
     WiFi.scanDelete();
     int scannedNetworks = WiFi.scanNetworks(); //WiFi.scanNetworks(async, show_hidden)
     for (int j = 0; j < scannedNetworks; j++) {
-        htmlHandler.addAvailableNetwork(WiFi.SSID(j), WiFi.encryptionType(j), WiFi.RSSI(j));
+        htmlHandler.addAvailableNetwork(WiFi.SSID(j).c_str(), WiFi.encryptionType(j), WiFi.RSSI(j));
     }
-    webPage = htmlHandler.getWifiPage();
+    webPage = htmlHandler.getWifiPage().c_str();
     server.setContentLength(webPage.length());
     server.send(200, MEDIATYPE_TEXT_HTML, webPage);
     htmlHandler.resetWifiPage();
@@ -319,16 +322,9 @@ void handleWifi() {
 
 
 void handleCss() {
-    String cssString = htmlHandler.getCss();
+    String cssString = htmlHandler.getCss().c_str();
     server.setContentLength(cssString.length());
     server.send(200, "text/css", cssString);
-}
-
-void doReboot() {
-    WiFi.disconnect();
-    delay(1000);
-    pinMode(BLINK_LED, OUTPUT);
-    digitalWrite(BLINK_LED, LOW);
 }
 
 void handleWifiSetup() {
@@ -460,21 +456,21 @@ void handleWifiSetup() {
 }
 
 void handleOpenValve() {
-    String page = htmlHandler.getSwitch(true);
+    String page = htmlHandler.getSwitch(true).c_str();
     server.setContentLength(page.length());
     server.send(200, MEDIATYPE_TEXT_HTML, page);
-    valveState = VALVE_OPEN;
+    valveHandler.openValve();
 }
 
 void handleCloseValve() {
-    String page = htmlHandler.getSwitch(false);
+    String page = htmlHandler.getSwitch(false).c_str();
     server.setContentLength(page.length());
     server.send(200, MEDIATYPE_TEXT_HTML, page);
-    valveState = VALVE_CLOSED;
+    valveHandler.closeValve();
 }
 
 void handleValveStatus() {
-    String page = htmlHandler.getSwitch(valveState == VALVE_OPEN);
+    String page = htmlHandler.getSwitch(valveHandler.getStatus() == VALVE_OPEN).c_str();
     server.setContentLength(page.length());
     server.send(200, MEDIATYPE_TEXT_HTML, page);
 }
@@ -483,12 +479,12 @@ void checkTrigger() {
     int triggerSetting = digitalRead(TRIGGER_PORT);
     // Trigger was used
     if (triggerSetting != lastTriggerState) {
-        valveState = triggerSetting == HIGH ? VALVE_OPEN : VALVE_CLOSED;
+        if (triggerSetting == HIGH) {
+            valveHandler.openValve();
+        } else {
+            valveHandler.closeValve();
+        }
     }
-}
-
-void setValve() {
-    digitalWrite(VALVE_PORT, valveState == VALVE_OPEN ? HIGH : LOW);
 }
 
 void loop() {
@@ -503,7 +499,6 @@ void loop() {
     server.handleClient();
     ArduinoOTA.handle();
     checkTrigger();
-    setValve();
     yield();
 }
 

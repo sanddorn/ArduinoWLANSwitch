@@ -7,8 +7,8 @@
 #include <FS.h>
 
 
-static String GetEncryptionType(byte thisType) {
-    String output = "";
+static string GetEncryptionType(byte thisType) {
+    string output = "";
     // read the encryption type and print out the name:
     switch (thisType) {
         case ENC_TYPE_WEP:
@@ -32,15 +32,15 @@ static String GetEncryptionType(byte thisType) {
     return output;
 }
 
-String HTMLHandler::getMainPage() {
+string HTMLHandler::getMainPage() {
     if (!spiffsStarted)
         return internalError;
-    String mainpage;
+    string mainpage;
     File mainpageFile = SPIFFS.open("/MainPage.html", "r");
     Serial.printf("SPIFFS.open returned File: %i\n", mainpageFile.isFile());
     if (mainpageFile.isFile() && mainpageFile.size() > 0) {
         Serial.printf("Returning Main-file\n");
-        mainpage = mainpageFile.readString();
+        mainpage = mainpageFile.readString().c_str();
         mainpageFile.close();
         SPIFFS.end();
 
@@ -51,13 +51,13 @@ String HTMLHandler::getMainPage() {
 }
 
 
-String HTMLHandler::getCss() {
+string HTMLHandler::getCss() {
     if (!spiffsStarted)
         return internalError;
-    String cssString;
+    string cssString;
     File cssFile = SPIFFS.open("/portal.css", "r");
     if (cssFile.isFile() && cssFile.size() > 0) {
-        cssString = cssFile.readString();
+        cssString = cssFile.readString().c_str();
         cssFile.close();
         Serial.printf("CSS-File Read\n");
     } else {
@@ -86,67 +86,69 @@ void HTMLHandler::setCurrentWifiSettings() {
     }
 }
 
-void HTMLHandler::setSSID(const String &ssid) {
+void HTMLHandler::setSSID(const string &ssid) {
     this->ssid = ssid;
 }
 
-void HTMLHandler::setAPName(const String &apname) {
+void HTMLHandler::setAPName(const string &apname) {
     this->apname = apname;
 }
 
-void HTMLHandler::setBSSID(const String &bssid) {
+void HTMLHandler::setBSSID(const string &bssid) {
     this->bssid = bssid;
 }
 
-String HTMLHandler::getAPName() {
+string HTMLHandler::getAPName() {
     return ssid.length() > 0 ? ssid : apname;
 }
 
-void HTMLHandler::addAvailableNetwork(const String &ssid, const uint8 encryption, int strength) {
+void HTMLHandler::addAvailableNetwork(const string &ssid, const uint8 encryption, int strength) {
     File partial = SPIFFS.open("/AvailableNetwork.partial", "r");
-    String newAvalilableNetwork;
+    string newAvalilableNetwork;
     if (partial.isFile() && partial.size() > 0) {
-        newAvalilableNetwork = partial.readString();
+        newAvalilableNetwork = partial.readString().c_str();
         partial.close();
         Serial.printf("Partial-File Read\n");
     } else {
         newAvalilableNetwork = internalError;
     }
-    newAvalilableNetwork.replace("<number/>", String(noNetwork));
-    newAvalilableNetwork.replace("<ssid/>", ssid);
-    newAvalilableNetwork.replace("<encryption/>", GetEncryptionType(encryption));
-    newAvalilableNetwork.replace("<strength/>", String(strength));
+    char tmp[10];
+    replaceString(newAvalilableNetwork, "<number/>", itoa(noNetwork, tmp, 10));
+    replaceString(newAvalilableNetwork, "<ssid/>", ssid);
+    replaceString(newAvalilableNetwork, "<encryption/>", GetEncryptionType(encryption));
+    replaceString(newAvalilableNetwork, "<strength/>", itoa(strength, tmp, 10));
 
     availableNetworks += newAvalilableNetwork;
 
     options += "<option value='" + ssid + "'>" + ssid + "</option>";
 }
 
-String HTMLHandler::getWifiPage() {
+string HTMLHandler::getWifiPage() {
     if (!spiffsStarted)
         return internalError;
-    String wifipage;
-    File wifiPage = SPIFFS.open("/WifiPage.html", "r");
-    if (wifiPage.isFile() && wifiPage.size() > 0) {
-        wifipage = wifiPage.readString();
-        wifiPage.close();
+    string wifiPage;
+    File wifiPageFile = SPIFFS.open("/WifiPage.html", "r");
+    if (wifiPageFile.isFile() && wifiPageFile.size() > 0) {
+        wifiPage = wifiPageFile.readString().c_str();
+        wifiPageFile.close();
         Serial.printf("Wifi-File Read\n");
     } else {
-        wifipage = internalError;
+        wifiPage = internalError;
     }
     setCurrentWifiSettings();
     if (wifiAPMode) {
-        wifipage.replace("ESP8266_Config_WLAN", apname);
+        replaceString(wifiPage, "ESP8266_Config_WLAN", apname);
+
     }
-    wifipage.replace("<apmode/>", String(wifiAPMode));
-    wifipage.replace("<currentWifiSettings/>", currentSettings);
-    wifipage.replace("<availableNetworks/>", availableNetworks);
+    replaceString(wifiPage, "<apmode/>", wifiAPMode == 0 ? "0" : "1");
+    replaceString(wifiPage, "<currentWifiSettings/>", currentSettings);
+    replaceString(wifiPage, "<availableNetworks/>", availableNetworks);
     if (options.length() > 0) {
-        wifipage.replace("<networkOtions/>", options);
+        replaceString(wifiPage, "<networkOtions/>", options);
     } else {
-        wifipage.replace("<networkOtions/>", "<option value='No_WiFi_Network'>No WiFiNetwork found </option>");
+        replaceString(wifiPage, "<networkOtions/>", "<option value='No_WiFi_Network'>No WiFiNetwork found </option>");
     }
-    return wifipage;
+    return wifiPage;
 }
 
 HTMLHandler::HTMLHandler() : wifiAPMode(0), noNetwork(0) {
@@ -169,22 +171,27 @@ void HTMLHandler::resetWifiPage() {
 
 }
 
-String HTMLHandler::getSwitch(bool open) {
+string HTMLHandler::getSwitch(bool open) {
     if (!spiffsStarted)
         return internalError;
-    String valvepage;
+    string valvepage;
     File valvePageFile = SPIFFS.open("/Valve.html", "r");
     if (valvePageFile.isFile() && valvePageFile.size() > 0) {
-        valvepage = valvePageFile.readString();
+        valvepage = valvePageFile.readString().c_str();
         valvePageFile.close();
         Serial.printf("Wifi-File Read\n");
     } else {
         valvepage = internalError;
     }
     if (open) {
-        valvepage.replace("&#x274C; The valve is closed", "&#x274E; The valve is open");
-
+        replaceString(valvepage, "&#x274C; The valve is closed", "&#x274E; The valve is open");
     }
     return valvepage;
+}
+
+void HTMLHandler::replaceString(string &original, const string &toReplace, const string &replacement) {
+    size_t start = original.find(toReplace);
+    size_t end = start + toReplace.length();
+    original.replace(start, end, replacement);
 }
 
