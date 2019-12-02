@@ -2,8 +2,8 @@
 // Created by Nils Bokermann on 19.11.19.
 //
 
-#ifndef ESP8266_WLAN_SCHALTER_EEPROMSTORAGE_H
-#define ESP8266_WLAN_SCHALTER_EEPROMSTORAGE_H
+#ifndef EEPROM_STORAGE_H
+#define EEPROM_STORAGE_H
 
 #define WIFI_PASSWORD_LENGTH 25
 #define ACCESSPOINT_NAME_LENGTH 20
@@ -11,8 +11,30 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
-class EEPromStorage {
+#define MAX_NUMBER_OF_NETS 5
+typedef struct _WifiStorage {
+    char AccessPointName[ACCESSPOINT_NAME_LENGTH];
+    char AccessPointPassword[WIFI_PASSWORD_LENGTH];
+} WifiStorage;
 
+
+class EEPromStorage {
+    EEPromStorage() : storageIsDirty(false), storageIsValid(false), actualData(nullptr) {};
+    ~EEPromStorage() = default;
+    int getNumberOfKnownNetworks();
+    void addWifiNetwork(WifiStorage newNetwork);
+    WifiStorage * retrieveNetwork(const char * ssid);
+    WifiStorage getSoftAPData();
+private:
+    struct StorageData {
+        WifiStorage fallback;
+        int numberOfNets;
+        WifiStorage knownNets[MAX_NUMBER_OF_NETS];
+        char configValid[3];
+    };
+    bool storageIsValid;
+    bool storageIsDirty;
+    struct StorageData *actualData;
 };
 
 struct WiFiEEPromData {
@@ -22,4 +44,6 @@ struct WiFiEEPromData {
     char ConfigValid[3]; //If Config is Vaild, Tag "TK" is required"
 };
 
-#endif //ESP8266_WLAN_SCHALTER_EEPROMSTORAGE_H
+
+
+#endif //EEPROM_STORAGE_H
