@@ -65,39 +65,19 @@ string HTMLHandler::getCss() {
 
 }
 
-void HTMLHandler::setWiFiAPMode(bool isSoftAP) {
-    Serial.printf("setting wifiAPMode: %i\n", isSoftAP);
-    wifiAPMode = isSoftAP ? 0 : 1;
-    Serial.printf("wifiAPMode is now: %i\n", wifiAPMode);
-}
-
-void HTMLHandler::setCurrentWifiSettings() {
-    Serial.printf("wifiAPMode is for currentWifiSettings: %i\n", wifiAPMode);
-    if (wifiAPMode == 0) {
-        currentSettings = "<div class='currentMode'>Mode : Soft Access Point (AP)</div>\n";
+void HTMLHandler::addRegisteredNetwork(const string &ssid) {
+    File partial = SPIFFS.open("/RegisteredNetwork.partial", "r");
+    string newRegisteredNetword;
+    if (partial.isFile() && partial.size() > 0) {
+        newRegisteredNetword = partial.readString().c_str();
+        partial.close();
+        Serial.printf("Partial-File Read\n");
     } else {
-        currentSettings = "<div class='currentMode'>Mode : Station (STA)</div>\n";
+        newRegisteredNetword = internalError;
     }
-    currentSettings += "<div class='currentInfo'>SSID  :  " + getAPName() + "</div>\n";
-    if (bssid.length() > 0) {
-        currentSettings += "<div class='currentInfo'>BSSID :  " + bssid + "</div>\n";
-    }
-}
+    replaceString(newRegisteredNetword, "<ssid/>", ssid);
+    registeredNetwork += newRegisteredNetword;
 
-void HTMLHandler::setSSID(const string &ssid) {
-    this->ssid = ssid;
-}
-
-void HTMLHandler::setAPName(const string &apname) {
-    this->apname = apname;
-}
-
-void HTMLHandler::setBSSID(const string &bssid) {
-    this->bssid = bssid;
-}
-
-string HTMLHandler::getAPName() {
-    return ssid.length() > 0 ? ssid : apname;
 }
 
 void HTMLHandler::addAvailableNetwork(const string &ssid, const uint8 encryption, int strength) {
@@ -133,13 +113,7 @@ string HTMLHandler::getWifiPage() {
     } else {
         wifiPage = internalError;
     }
-    setCurrentWifiSettings();
-    if (wifiAPMode) {
-        replaceString(wifiPage, "ESP8266_Config_WLAN", apname);
-
-    }
-    replaceString(wifiPage, "<apmode/>", wifiAPMode == 0 ? "0" : "1");
-    replaceString(wifiPage, "<currentWifiSettings/>", currentSettings);
+    replaceString(wifiPage, "<configuredNetworks/>", registeredNetwork);
     replaceString(wifiPage, "<availableNetworks/>", availableNetworks);
     if (options.length() > 0) {
         replaceString(wifiPage, "<networkOtions/>", options);
@@ -149,7 +123,10 @@ string HTMLHandler::getWifiPage() {
     return wifiPage;
 }
 
-HTMLHandler::HTMLHandler() : wifiAPMode(0), noNetwork(0) {
+HTMLHandler::HTMLHandler() : noNetwork(0) {
+    fs::SPIFFSConfig cfg;
+    cfg.setAutoFormat(false);
+    SPIFFS.setConfig(cfg);
     spiffsStarted = SPIFFS.begin();
     Serial.printf("SPIFFS started: '%i'\n", spiffsStarted);
 }
@@ -161,10 +138,6 @@ HTMLHandler::~HTMLHandler() {
 void HTMLHandler::resetWifiPage() {
     options = "";
     availableNetworks = "";
-    currentSettings = "";
-    ssid = "";
-    bssid = "";
-    apname = "";
     noNetwork = 0;
 
 }

@@ -1,6 +1,7 @@
 <tr>
-    <td><number/></td>
-    <td><ssid/></td>
+    <td><input type="checkbox" name="<ssid/>_checked"/></td>
+    <td><ssid/><input type="hidden" name="<number/> value="ssid"/></td>
     <td><encryption/></td>
     <td><strenght/></td>
+    <td><input type="password" name="<ssid/>_password"/></td>
 </tr>

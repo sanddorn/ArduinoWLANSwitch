@@ -10,6 +10,7 @@
 
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <string>
 
 #define MAX_NUMBER_OF_NETS 5
 typedef struct _WifiStorage {
@@ -18,13 +19,28 @@ typedef struct _WifiStorage {
 } WifiStorage;
 
 
+static const int eeprom_size = 512;
+
 class EEPromStorage {
-    EEPromStorage() : storageIsDirty(false), storageIsValid(false), actualData(nullptr) {};
-    ~EEPromStorage() = default;
+public:
+    EEPromStorage();
+
+    ~EEPromStorage() {
+        EEPROM.end();
+    };
+
     int getNumberOfKnownNetworks();
+
     void addWifiNetwork(WifiStorage newNetwork);
-    WifiStorage * retrieveNetwork(const char * ssid);
+
+    WifiStorage *retrieveNetwork(const char *ssid);
+
     WifiStorage getSoftAPData();
+
+    char *getApSSID(int number);
+
+    void removeWifiNetwork(String &string);
+
 private:
     struct StorageData {
         WifiStorage fallback;
@@ -43,7 +59,6 @@ struct WiFiEEPromData {
     char WiFiPwd[WIFI_PASSWORD_LENGTH]; // WiFiPAssword, if definded
     char ConfigValid[3]; //If Config is Vaild, Tag "TK" is required"
 };
-
 
 
 #endif //EEPROM_STORAGE_H
