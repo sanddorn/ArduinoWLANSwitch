@@ -39,7 +39,7 @@ public:
 
     char *getApSSID(int number);
 
-    void removeWifiNetwork(String &string);
+    void removeWifiNetwork(const char * ssid);
 
 private:
     struct StorageData {

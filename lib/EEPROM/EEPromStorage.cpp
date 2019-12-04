@@ -5,7 +5,7 @@
 #include "EEPromStorage.h"
 
 #define DEBUG(x) Serial.printf(x)
-#define DEBUG1(x,y) Serial.printf(x,y)
+#define DEBUG1(x, y) Serial.printf(x,y)
 
 static const char *const ap_name = "ESP8266_Config_WLAN";
 
@@ -73,6 +73,17 @@ WifiStorage EEPromStorage::getSoftAPData() {
     return actualData->fallback;
 }
 
-void EEPromStorage::removeWifiNetwork(String &string) {
-// TODO Implement
+void EEPromStorage::removeWifiNetwork(const char *const ssid) {
+    for (int i = 0; i < actualData->numberOfNets; i++) {
+        if (strncmp(actualData->knownNets[i].AccessPointName, ssid, MAX_NUMBER_OF_NETS) == 0) {
+            // Move all following members down
+            int j = i + 1;
+            while (j < actualData->numberOfNets) {
+                actualData->knownNets[j - 1] = actualData->knownNets[j];
+            }
+            actualData->numberOfNets--;
+            return;
+        }
+    }
 }
+
