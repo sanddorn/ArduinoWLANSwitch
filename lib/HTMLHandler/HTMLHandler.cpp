@@ -8,7 +8,7 @@
 
 
 static string GetEncryptionType(byte thisType) {
-    string output = "";
+    string output;
     // read the encryption type and print out the name:
     switch (thisType) {
         case ENC_TYPE_WEP:
@@ -42,8 +42,6 @@ string HTMLHandler::getMainPage() {
         Serial.printf("Returning Main-file\n");
         mainpage = mainpageFile.readString().c_str();
         mainpageFile.close();
-        SPIFFS.end();
-
     } else {
         mainpage = internalError;
     }
@@ -179,7 +177,7 @@ string HTMLHandler::getSwitch(bool open) {
     if (valvePageFile.isFile() && valvePageFile.size() > 0) {
         valvepage = valvePageFile.readString().c_str();
         valvePageFile.close();
-        Serial.printf("Wifi-File Read\n");
+        Serial.printf("Valve-File Read\n");
     } else {
         valvepage = internalError;
     }
@@ -191,7 +189,9 @@ string HTMLHandler::getSwitch(bool open) {
 
 void HTMLHandler::replaceString(string &original, const string &toReplace, const string &replacement) {
     size_t start = original.find(toReplace);
-    size_t end = start + toReplace.length();
-    original.replace(start, end, replacement);
+    size_t len = toReplace.length();
+    if (start != string::npos) {
+        original.replace(start, len, replacement);
+    }
 }
 

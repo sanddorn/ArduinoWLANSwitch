@@ -9,8 +9,7 @@
 #include "../lib/ValveHandler/ValveHandler.h"
 
 
-#define BLINK_LED D5
-#define VALVE_PORT D1
+#define VALVE_PORT 13
 #define TRIGGER_PORT D2
 
 
@@ -73,7 +72,6 @@ void handleCloseValve();
 void handleValveStatus();
 
 void setup() {
-    pinMode(BLINK_LED, OUTPUT); // Initialize the BUILTIN_LED1 pin as an output
     pinMode(VALVE_PORT, OUTPUT);
     pinMode(TRIGGER_PORT, INPUT);
     digitalWrite(VALVE_PORT, LOW);

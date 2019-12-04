@@ -7,10 +7,12 @@
 
 void ValveHandler::openValve() {
     valveState = VALVE_OPEN;
+    digitalWrite(valvePin, HIGH);
 }
 
 void ValveHandler::closeValve() {
     valveState = VALVE_CLOSED;
+    digitalWrite(valvePin, LOW);
 }
 
 unsigned char ValveHandler::getStatus() {
