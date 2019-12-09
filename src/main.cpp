@@ -10,7 +10,7 @@
 
 
 #define VALVE_PORT 13
-#define TRIGGER_PORT D2
+#define TRIGGER_PORT D5
 
 
 int lastTriggerState = LOW;
@@ -69,7 +69,7 @@ void setup() {
     pinMode(VALVE_PORT, OUTPUT);
     pinMode(TRIGGER_PORT, INPUT);
     digitalWrite(VALVE_PORT, LOW);
-    Serial.begin(9600);
+    Serial.begin(115200);
     Serial.println("booting");
     softap_up = false;
     WiFi.hostname(ESPHostname); // Set the DHCP hostname assigned to ESP station.
@@ -208,12 +208,6 @@ void handleWifi() {
     server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
-
-    htmlHandler.setSSID(WiFi.SSID().c_str());
-    htmlHandler.setAPName(MyWiFiConfig.APSTAName);
-    if (!MyWiFiConfig.AccessPointMode) {
-        htmlHandler.setBSSID(WiFi.BSSIDstr().c_str());
-    }
 
     WiFi.scanDelete();
     int scannedNetworks = WiFi.scanNetworks(); //WiFi.scanNetworks(async, show_hidden)
