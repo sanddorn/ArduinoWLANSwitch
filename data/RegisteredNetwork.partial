@@ -1,0 +1,4 @@
+<tr>
+    <td><input type="checkbox" name="<ssid/>_delete"/></td>
+    <td><ssid/></td>
+</tr>

@@ -10,8 +10,7 @@
 
 
 #define VALVE_PORT 13
-#define TRIGGER_PORT D2
-
+#define TRIGGER_PORT D5
 
 
 int lastTriggerState = LOW;
@@ -20,36 +19,28 @@ const char *ESPHostname = "ESP";
 
 // DNS server
 const byte DNS_PORT = 53;
-static const char *const ap_name = "ESP8266_Config_WLAN";
+
 DNSServer dnsServer;
 
 HTMLHandler htmlHandler;
 
 ValveHandler valveHandler(VALVE_PORT);
 
-//Conmmon Paramenters
-bool SoftAccOK = false;
+EEPromStorage storage;
 
 // Web server
 ESP8266WebServer server(80);
 
-/* Soft AP network parameters */
+/* Soft AP available_network parameters */
 IPAddress apIP(172, 20, 0, 1);
 IPAddress netMsk(255, 255, 255, 0);
 
-WiFiEEPromData MyWiFiConfig;
 
-bool reconnect;
+bool isSoftAP;
 
-bool loadCredentials();
+bool isAPAccociated;
 
-bool CreateWifiSoftAP();
-
-byte ConnectWifiAP();
-
-void SetDefaultWiFiConfig();
-
-bool saveCredentials();
+void CreateWifiSoftAP();
 
 void InitalizeHTTPServer();
 
@@ -71,14 +62,30 @@ void handleCloseValve();
 
 void handleValveStatus();
 
+void scan_completed(int noNetworks);
+
+typedef struct _wifi_info {
+    char *ssid;
+    uint8_t encryption;
+    int32_t strength;
+} WIFI_INFO;
+
+WIFI_INFO *available_networks;
+
+
+
 void setup() {
     pinMode(VALVE_PORT, OUTPUT);
     pinMode(TRIGGER_PORT, INPUT);
     digitalWrite(VALVE_PORT, LOW);
-    Serial.begin(9600);
+    Serial.begin(115200);
     Serial.println("booting");
+    isSoftAP = false;
+    storage.initStorage();
+//    storage.resetStorage();
     WiFi.hostname(ESPHostname); // Set the DHCP hostname assigned to ESP station.
     Serial.setDebugOutput(true); //Debug Output for WLAN on Serial Interface.
+    available_networks = nullptr;
     startWifi();
     ArduinoOTA.onStart([]() {
         Serial.println("Start");
@@ -100,48 +107,28 @@ void setup() {
     ArduinoOTA.setPassword("Password");
     ArduinoOTA.begin();
 
-    fs::SPIFFSConfig cfg;
-    cfg.setAutoFormat(false);
-    SPIFFS.setConfig(cfg);
-
     Serial.println("Ready");
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 }
 
 void startWifi() {
-    bool ConnectSuccess;
-    byte len;
     WiFi.disconnect();
     /* Function will set currently configured SSID and password of the soft-AP to null values. The parameter  is optional. If set to true it will switch the soft-AP mode off.*/
     WiFi.softAPdisconnect(true);
-    if (loadCredentials()) // Load WLAN credentials for WiFi Settings
-    {
-        // Valid Credentials found.
-        if (MyWiFiConfig.AccessPointMode)  // AP Mode
-        {
-            Serial.println("AP Mode");
-            ConnectSuccess = CreateWifiSoftAP();
-        } else {
-            Serial.println("STA Mode");
-            len = ConnectWifiAP();
-            ConnectSuccess = (len == 3);
-        }
-    } else { //Set default Config - Create AP
-        Serial.println("DefaultWiFi Cnf");
-        SetDefaultWiFiConfig();
-        ConnectSuccess = CreateWifiSoftAP();
-        saveCredentials();
-    }
-    if (ConnectSuccess) {
+
+    Serial.println("AP Mode");
+    CreateWifiSoftAP();
+    WiFi.scanDelete();
+    WiFi.scanNetworksAsync(scan_completed);;
+    if (isSoftAP) {
         Serial.println("Wifi Setup Succes");
     } else {
         Serial.println("No SoftAP or STA could be started. Resetting to default");
-        SetDefaultWiFiConfig();
-        saveCredentials();
-        CreateWifiSoftAP();
+        storage.resetStorage();
     }
     InitalizeHTTPServer();
+
 }
 
 void InitalizeHTTPServer() {
@@ -157,121 +144,67 @@ void InitalizeHTTPServer() {
     server.begin(); // Web server start
 }
 
-bool CreateWifiSoftAP() {
+void CreateWifiSoftAP() {
+    WifiStorage softAP = storage.getSoftAPData();
     Serial.print("SoftAP ");
-    Serial.printf("AP Settings: '%s' Passwd: '%s'\n", MyWiFiConfig.APSTAName, MyWiFiConfig.WiFiPwd);
+    Serial.printf("SoftAP Settings: '%s' Passwd: '%s'\n", softAP.AccessPointName, softAP.AccessPointPassword);
     WiFi.softAPConfig(apIP, apIP, netMsk);
-    SoftAccOK = WiFi.softAP(MyWiFiConfig.APSTAName, MyWiFiConfig.WiFiPwd); // Passwortlänge mindestens 8 Zeichen !
+    bool SoftAccOK = WiFi.softAP(softAP.AccessPointName, softAP.AccessPointPassword); // Passwortlänge mindestens 8 Zeichen !
     delay(600); // Without delay I've seen the IP address blank
     if (SoftAccOK) {
-        Serial.println("OK");
-        Serial.println(MyWiFiConfig.APSTAName);
-        Serial.println(MyWiFiConfig.WiFiPwd);
+        Serial.println("SoftAP: OK");
         /* Setup the DNS server redirecting all the domains to the apIP */
         dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
         dnsServer.start(DNS_PORT, "*", apIP);
+        isSoftAP = true;
+        isAPAccociated = false;
     } else {
-        Serial.println("err");
-        Serial.println(MyWiFiConfig.APSTAName);
-        Serial.println(MyWiFiConfig.WiFiPwd);
+        Serial.println("Softap: err");
     }
-    return SoftAccOK;
+    WiFi.scanDelete();
+    WiFi.scanNetworksAsync(scan_completed);
 }
 
+void set_disconnected(const WiFiEventStationModeDisconnected & wiFiEventStationModeDisconnected) {
+    Serial.printf("Disconnected from AP %s for reasonNo %i\n", wiFiEventStationModeDisconnected.ssid.c_str(), wiFiEventStationModeDisconnected.reason);
+}
 
-byte ConnectWifiAP() {
-    // Serial.println("Initalizing Wifi Client.");
-    byte connRes = 0;
+bool connect_to_wifi(WifiStorage *wifiStorage) {
+    Serial.printf("connect_to_wifi\n");
+    WiFi.softAPdisconnect(false);
+    isSoftAP = false;
+    Serial.printf("stopped SoftAP, Starting Associate with network: %s:%s\n", wifiStorage->AccessPointName,
+                  wifiStorage->AccessPointPassword);
+    WiFi.begin(wifiStorage->AccessPointName, wifiStorage->AccessPointPassword);
+    WiFi.onStationModeDisconnected(set_disconnected);
     byte i = 0;
-    WiFi.begin(MyWiFiConfig.APSTAName, MyWiFiConfig.WiFiPwd);
-    connRes = WiFi.waitForConnectResult();
-    delay(500);
-    while ((connRes == 0) and (i != 10))  //if connRes == 0  "IDLE_STATUS - change Statius"
-    {
-        connRes = WiFi.waitForConnectResult();
-        delay(1000);
+    Serial.printf("Checking ConnectionResult\n");
+    byte connRes = WL_DISCONNECTED;
+    while ((connRes != WL_CONNECTED) && (i < 10)) {
+        connRes = WiFi.waitForConnectResult(60000);
         i++;
-        Serial.println(".");
-        // statement(s)
+        Serial.printf("Connecting to %s, Wait-Phase %i\n", wifiStorage->AccessPointName, i);
     }
-    while ((connRes == 1) and (i != 10))  //if connRes == 1  NO_SSID_AVAILin - SSID cannot be reached
-    {
-        connRes = WiFi.waitForConnectResult();
-        delay(1000);
-        i++;
-        Serial.println(".");
-        // statement(s)
-    }
-    if (connRes == 3) {
-        Serial.print("STA ");
-        // Set whether module will attempt to reconnect to an access point in case it is disconnected.
-        WiFi.setAutoReconnect(true);
-        // Setup MDNS responder
-        if (!MDNS.begin(ESPHostname)) {
-            Serial.println("Err: MDNS");
-        } else {
-            MDNS.addService("http", "tcp", 80);
-        }
-        server.stop();
-        server.begin();
-    }
-    if (connRes == 4) {
-        Serial.println("STA Pwd Err");
-        Serial.println(MyWiFiConfig.APSTAName);
-        Serial.println(MyWiFiConfig.WiFiPwd);
-        WiFi.disconnect();
-    }
-    // if (connRes == 6 ) { Serial.println("DISCONNECTED - Not in station mode"); }
-    // WiFi.printDiag(Serial);
-    return connRes;
+    return connRes == WL_CONNECTED;
 }
 
-bool loadCredentials() {
-    bool retValue;
-    EEPROM.begin(512);
-    EEPROM.get(0, MyWiFiConfig);
-    EEPROM.end();
-    retValue = String("TK").equals(String(MyWiFiConfig.ConfigValid)) != 0;
-    return retValue;
-}
-
-
-/** Store WLAN credentials to EEPROM */
-
-bool saveCredentials() {
-    if (MyWiFiConfig.AccessPointMode) {
-        if (sizeof(String(MyWiFiConfig.WiFiPwd)) < 8) {
-            return false;  // Invalid Config
-        }
-        if (sizeof(String(MyWiFiConfig.APSTAName)) < 1) {
-            return false;  // Invalid Config
-        }
+void scan_completed(int noNetworks) {
+    Serial.printf("scan_completed: %i\n", noNetworks);
+    WIFI_INFO *net = available_networks;
+    while (net != nullptr && net->ssid != nullptr) {
+        delete[] net->ssid;
+        net++;
     }
-    // End Check logical Errors
-    EEPROM.begin(512);
-    for (int i = 0; i < (int) sizeof(MyWiFiConfig); i++) {
-        EEPROM.write(i, 0);
-    }
-    strncpy(MyWiFiConfig.ConfigValid, "TK", sizeof(MyWiFiConfig.ConfigValid));
-    EEPROM.put(0, MyWiFiConfig);
-    EEPROM.commit();
-    EEPROM.end();
-    return true;
-}
+    delete[]available_networks;
+    available_networks = new WIFI_INFO[noNetworks + 1];
+    available_networks[noNetworks].ssid = nullptr;
 
-void SetDefaultWiFiConfig() {
-    byte len;
-    MyWiFiConfig.AccessPointMode = true;
-    strncpy(MyWiFiConfig.APSTAName, ap_name, sizeof(MyWiFiConfig.APSTAName));
-    len = strlen(MyWiFiConfig.APSTAName);
-    MyWiFiConfig.APSTAName[len + 1] = '\0';
-    strncpy(MyWiFiConfig.WiFiPwd, "12345678", sizeof(MyWiFiConfig.WiFiPwd)); // no password
-    len = strlen(MyWiFiConfig.WiFiPwd);
-    MyWiFiConfig.WiFiPwd[len + 1] = '\0';
-    strncpy(MyWiFiConfig.ConfigValid, "TK", sizeof(MyWiFiConfig.ConfigValid));
-    len = strlen(MyWiFiConfig.ConfigValid);
-    MyWiFiConfig.ConfigValid[len + 1] = '\0';
-    Serial.println("RstWiFiCrd");
+    for (int i = 0; i < noNetworks; i++) {
+        available_networks[i].ssid = new char[strlen(WiFi.SSID(i).c_str()) + 1];
+        strcpy(available_networks[i].ssid, WiFi.SSID(i).c_str());
+        available_networks[i].encryption = WiFi.encryptionType(i);
+        available_networks[i].strength = WiFi.RSSI(i);
+    }
 }
 
 void handleRoot() {
@@ -288,7 +221,8 @@ void handleRoot() {
 
 
 void handleNotFound() {
-    // Serial.println("Request redirected to captive portal");
+    Serial.println("Request redirected to captive portal");
+    Serial.printf("server.client(): %s", server.client().localIP().toString().c_str());
     server.sendHeader("Location", String("http://") + server.client().localIP().toString(), true);
     server.send(302, MEDIATYPE_TEXT_PLAIN,
                 "Redirect");
@@ -301,21 +235,19 @@ void handleWifi() {
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
 
-    htmlHandler.setSSID(WiFi.SSID().c_str());
-    htmlHandler.setAPName(MyWiFiConfig.APSTAName);
-    if (!MyWiFiConfig.AccessPointMode) {
-        htmlHandler.setBSSID(WiFi.BSSIDstr().c_str());
+    for (int i = 0; i < storage.getNumberOfKnownNetworks(); i++) {
+        htmlHandler.addRegisteredNetwork(storage.getApSSID(i));
     }
-    htmlHandler.setWiFiAPMode(MyWiFiConfig.AccessPointMode);
-    WiFi.scanDelete();
-    int scannedNetworks = WiFi.scanNetworks(); //WiFi.scanNetworks(async, show_hidden)
-    for (int j = 0; j < scannedNetworks; j++) {
-        htmlHandler.addAvailableNetwork(WiFi.SSID(j).c_str(), WiFi.encryptionType(j), WiFi.RSSI(j));
+    WIFI_INFO *network = available_networks;
+    while (network->ssid != nullptr) {
+        htmlHandler.addAvailableNetwork(network->ssid, network->encryption, network->encryption);
+        network++;
     }
     webPage = htmlHandler.getWifiPage().c_str();
+    htmlHandler.resetWifiPage();
     server.setContentLength(webPage.length());
     server.send(200, MEDIATYPE_TEXT_HTML, webPage);
-    htmlHandler.resetWifiPage();
+
 }
 
 
@@ -325,132 +257,56 @@ void handleCss() {
     server.send(200, "text/css", cssString);
 }
 
+
 void handleWifiSetup() {
-    String temp = "";
-    // STA Station Mode Connect to another WIFI Station
+    /*
+     *
+WiFi_Add_Network	ssid
+STAWLanPW	asdf
 
-    if ((server.arg("WiFiMode") == "1")) {
+Settings
 
-        // Connect to existing STATION
-        if (server.arg("WiFi_Network").length() > 0) {
-            Serial.println("Configuring STA Mode");
-            MyWiFiConfig.AccessPointMode = false; // Access Point or Station Mode - false Station Mode
-            memset(MyWiFiConfig.APSTAName, '\0', ACCESSPOINT_NAME_LENGTH);
+     */
 
-            String networkName = server.arg("WiFi_Network");
-            unsigned int networkNamelength = networkName.length();
-            for (unsigned int i = 0; i < networkNamelength; i++) {
-                MyWiFiConfig.APSTAName[i] = networkName[i];
-            }
-            memset(MyWiFiConfig.WiFiPwd, '\0', WIFI_PASSWORD_LENGTH);
-            String serverPassword = server.arg("STAWLanPW");
-            unsigned int passwordLength = serverPassword.length();
-            for (unsigned int i = 0; i < passwordLength; i++) {
-                if (serverPassword[i] > 32) //Steuerzeichen raus
-                {
-                    MyWiFiConfig.WiFiPwd[i] = serverPassword[i];
-                }
-            }
-            //    MyWiFiConfig.WiFiPwd[len+1] = '\0';
-            temp = "WiFi Connect to AP: -";
-            temp += MyWiFiConfig.APSTAName;
-            temp += "-<br>WiFi PW: -";
-            temp += MyWiFiConfig.WiFiPwd;
-            temp += "-<br>";
-            temp += "Connecting to STA Mode in 2 Seconds..<br>";
-            if (saveCredentials()) // Save AP ConfigCongfig
-            {
-                temp += "Daten des STA Modes erfolgreich gespeichert. ";
-            } else {
-                temp += "Daten des STA Modes fehlerhaft.";
-            }
-            server.send(200, MEDIATYPE_TEXT_HTML, temp);
-            server.sendContent(temp);
-            delay(2000);
-            server.client().stop();
-            server.stop();
-            temp = "";
-
-            delay(500);
-            // ConnectWifiAP
-            int wifiConnectResult = ConnectWifiAP();
-
-            // 4: WL_CONNECT_FAILED - Password is incorrect 1: WL_NO_SSID_AVAILin - Configured SSID cannot be reached
-            if (wifiConnectResult != 3) {
-                Serial.printf("Err STA Result: %i", wifiConnectResult);
-                server.client().stop();
-                delay(100);
-                WiFi.setAutoReconnect(false);
-                delay(100);
-                WiFi.disconnect();
-                delay(1000);
-                CreateWifiSoftAP();
-            } else {
-                // Safe Config
-                InitalizeHTTPServer();
-            }
+    // remove unwanted networks from known available_network list
+    vector<String> networksToDelete;
+    for (int i = 0; i < storage.getNumberOfKnownNetworks(); i++) {
+        String networkName = storage.getApSSID(i);
+        networkName += +"_delete";
+        if (server.hasArg(networkName) && server.arg(networkName).equals("on")) {
+            networksToDelete.emplace_back(storage.getApSSID(i));
         }
-        return;
-    } else {
-        unsigned int passwordLength;
-        // Configure Access Point
-        String apName = server.arg("APPointName");
-        unsigned int apNameLength = apName.length();
-        String password = server.arg("APPW");
-        passwordLength = password.length();
-
-        if ((apNameLength > 1) and (password == server.arg("APPWRepeat")) and (passwordLength > 7)) {
-            temp = "";
-            Serial.println("Configuring APMode");
-            MyWiFiConfig.AccessPointMode = true; // Access Point or Sation Mode - true AP Mode
-
-            // reset AP Name
-            memset(MyWiFiConfig.APSTAName, '\0', ACCESSPOINT_NAME_LENGTH);
-
-            for (unsigned int i = 0; i < apNameLength; i++) {
-                MyWiFiConfig.APSTAName[i] = apName[i];
-            }
-
-            memset(MyWiFiConfig.WiFiPwd, '\0', WIFI_PASSWORD_LENGTH);
-            for (unsigned int i = 0; i < passwordLength; i++) {
-                MyWiFiConfig.WiFiPwd[i] = password[i];
-            }
-            if (saveCredentials()) // Save AP ConfigCongfig
-            {
-                temp = "Daten des AP Modes erfolgreich gespeichert. Reboot notwendig.";
-                temp += "AccessPointName: ";
-                temp += MyWiFiConfig.APSTAName;
-                temp += "\nPassword: ";
-                temp += MyWiFiConfig.WiFiPwd;
-                temp += "\n";
-            } else {
-                temp = "Daten des AP Modes fehlerhaft.";
-            }
-            server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-            server.sendHeader("Pragma", "no-cache");
-            server.sendHeader("Expires", "-1");
-            server.setContentLength(temp.length());
-            server.send(200, MEDIATYPE_TEXT_PLAIN, temp);
-            Serial.println(temp);
-            reconnect = true;
-            return;
-        } else if (server.arg("APPW") != server.arg("APPWRepeat")) {
-            temp = "WLAN Passwort nicht gleich. Abgebrochen.";
-        } else {
-            temp = "WLAN Passwort oder AP Name zu kurz. Abgebrochen.";
-        }
-        if (temp.length() > 0) {
-            // HTML Header
-            server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-            server.sendHeader("Pragma", "no-cache");
-            server.sendHeader("Expires", "-1");
-            server.setContentLength(temp.length());
-            server.send(417, MEDIATYPE_TEXT_PLAIN, temp);
-            Serial.println(temp);
-            return;
-        }
-        // End WifiAP
     }
+    for (auto iterator = networksToDelete.begin(); iterator < networksToDelete.end(); iterator++) {
+        storage.removeWifiNetwork((*iterator).c_str());
+    }
+    // Add new Network, if any
+    if (server.hasArg("WiFi_Add_Network")) {
+
+        WifiStorage addNEtwork{};
+        strncpy(addNEtwork.AccessPointName, server.arg("WiFi_Add_Network").c_str(), ACCESSPOINT_NAME_LENGTH);
+        if (server.hasArg("STAWLanPW")) {
+            strncpy(addNEtwork.AccessPointPassword, server.arg("STAWLanPW").c_str(), WIFI_PASSWORD_LENGTH);
+        }
+        Serial.printf("Add available_network: '%s':'%s\n", addNEtwork.AccessPointName, addNEtwork.AccessPointPassword);
+        storage.addWifiNetwork(addNEtwork);
+    }
+
+    server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    server.sendHeader("Pragma", "no-cache");
+    server.sendHeader("Expires", "-1");
+    server.sendHeader("Content-length", "2");
+    // TODO: Maybe redirect?
+    server.send(200, MEDIATYPE_TEXT_PLAIN, "Ok");
+    WiFi.scanDelete();
+    WiFi.scanNetworksAsync(scan_completed);
+    // TODO: Settings of local endpoint...
+    /*
+     * APPointName	ESP8266_Config_WLAN
+     * APPW	12345678
+     * APPWRepeat	12345678
+     */
+    // ------- Old impl
 }
 
 void handleOpenValve() {
@@ -486,17 +342,37 @@ void checkTrigger() {
 }
 
 void loop() {
-    if (SoftAccOK) {
+    if (isSoftAP) {
         dnsServer.processNextRequest(); //DNS
-    }
-    if (reconnect) {
-        startWifi();
-        reconnect = false;
     }
     //HTTP
     server.handleClient();
     ArduinoOTA.handle();
     checkTrigger();
+    WIFI_INFO *network = available_networks;
+    while (!isAPAccociated && network != nullptr && network->ssid != nullptr) {
+        Serial.printf("Checking for known networks\n");
+        Serial.printf("Checking for ssid: %s\n", network->ssid);
+        WifiStorage *wifi = storage.retrieveNetwork(network->ssid);
+
+        if (wifi != nullptr) {
+            if (connect_to_wifi(wifi)) {
+                isAPAccociated = true;
+                isSoftAP = false;
+                Serial.printf("Connection to AP succeedd: %s\n", wifi->AccessPointName);
+            }
+        }
+        network++;
+    }
+    if (!isAPAccociated) {
+        Serial.printf("No AP Connection could be used\n");
+        WiFi.scanDelete();
+        WiFi.scanNetworksAsync(scan_completed);
+    }
+    if (!isAPAccociated && ! isSoftAP) {
+        CreateWifiSoftAP();
+    }
+
     yield();
 }
 

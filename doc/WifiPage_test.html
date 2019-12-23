@@ -1,0 +1,119 @@
+<!DOCTYPE HTML>
+<html lang='de'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name=viewport content='width=device-width, initial-scale=1.0'>
+    <link rel="stylesheet" href="../data/portal.css">
+    <title>Wifi Switch</title>
+</head>
+<body>
+<h2>WiFi Settings</h2>
+<form action='/wifiSetup' method='post'>
+    <div class="currentSettings">
+        <h4>Current WiFi Settings:</h4>
+        <div class="networks">
+            <div class="heading">Configured WiFi Networks:</div>
+            <table>
+                <tr>
+                    <th>Delete</th>
+                    <th>SSID</th>
+                </tr>
+                <!-- COnfigured Network Begin -->
+                <tr>
+                    <td><input type="checkbox" name="ssid_delete"/></td>
+                    <td>ssid</td>
+                </tr>
+                <!-- COnfigured Network END -->
+            </table>
+        </div>
+    </div>
+    <br>
+    <div class="networks">
+        <div class="heading">Available WiFi Networks:</div>
+        <table>
+            <tr>
+                <th>Number</th>
+                <th>SSID</th>
+                <th>Encryption</th>
+                <th>WiFi Strength</th>
+            </tr>
+            <!-- AvailableNetwork.partial: BEGIN -->
+            <tr>
+                <td>1</td>
+                <td>
+                    ssid
+                </td>
+                <td>
+                    wpa
+                </td>
+                <td>
+                    13
+                </td>
+            </tr>
+            <!-- AvailableNetwork.partial: END -->
+            <!-- AvailableNetwork.partial: BEGIN -->
+            <tr>
+                <td>2</td>
+                <td>
+                    ssid
+                </td>
+                <td>
+                    wpa
+                </td>
+                <td>
+                    13
+                </td>
+            </tr>
+            <!-- AvailableNetwork.partial: END -->
+        </table>
+        <table>
+            <tr>
+                <td>Add WiFi SSID:</td>
+                <td><select name='WiFi_Add_Network'>
+                    <!-- Network Options BEGIN -->
+                    <option value="ssid">ssid</option>
+                    <option value="ssid2">ssid2</option>
+                    <!-- Network Options END -->
+                </select></td>
+            </tr>
+            <tr>
+                <td>WiFi Password:</td>
+                <td><label>
+                    <input type='text' name='STAWLanPW' maxlength='40' size='40'>
+                </label></td>
+            </tr>
+        </table>
+    </div>
+    <div class="networks">
+        <div class="heading">Fallback Network (Soft-AP)</div>
+        <table>
+            <tr>
+                <td>WiFi Access Point Name:</td>
+                <td><input type='text' name='APPointName' maxlength='19' size='30' value='ESP8266_Config_WLAN'>
+                </td>
+            </tr>
+            <tr>
+                <td>WiFi Password:</td>
+                <td><input type='password' name='APPW' maxlength='24' size='30' value='12345678'></td>
+            </tr>
+            <tr>
+                <td>Repeat WiFi Password:</td>
+                <td><input type='password' name='APPWRepeat' maxlength='24' size='30' value='12345678'></td>
+            </tr>
+        </table>
+        <div class="buttonbox">
+            <button type='submit' name='Settings' autofocus>Set WiFi
+                Settings
+            </button>
+            <button type='reset' name='action'>Reset Inputs</button>
+        </div>
+    </div>
+</form>
+<h3>Links:</h3>
+<table class="systemlinks">
+    <tr>
+        <th><a href='/wifi'>WIFI Settings</a></th>
+    </tr>
+</table>
+</body>
+</html>
