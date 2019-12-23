@@ -41,6 +41,10 @@ public:
 
     void removeWifiNetwork(const char * ssid);
 
+    void initStorage();
+
+    void resetStorage();
+
 private:
     struct StorageData {
         WifiStorage fallback;
@@ -50,7 +54,10 @@ private:
     };
     bool storageIsValid;
     bool storageIsDirty;
-    struct StorageData *actualData;
+    struct StorageData actualData;
+
+
+    void saveToEEPROM();
 };
 
 struct WiFiEEPromData {

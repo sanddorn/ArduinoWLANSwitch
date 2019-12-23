@@ -81,6 +81,9 @@ void HTMLHandler::addRegisteredNetwork(const string &ssid) {
 }
 
 void HTMLHandler::addAvailableNetwork(const string &ssid, const uint8 encryption, int strength) {
+    if (ssid.length() < 2) {
+        return;
+    }
     File partial = SPIFFS.open("/AvailableNetwork.partial", "r");
     string newAvalilableNetwork;
     if (partial.isFile() && partial.size() > 0) {
@@ -90,6 +93,7 @@ void HTMLHandler::addAvailableNetwork(const string &ssid, const uint8 encryption
     } else {
         newAvalilableNetwork = internalError;
     }
+    Serial.printf("adding Network '%s'\n", ssid.c_str());
     char tmp[10];
     replaceString(newAvalilableNetwork, "<number/>", itoa(noNetwork, tmp, 10));
     replaceString(newAvalilableNetwork, "<ssid/>", ssid);
@@ -136,8 +140,9 @@ HTMLHandler::~HTMLHandler() {
 }
 
 void HTMLHandler::resetWifiPage() {
-    options = "";
+    options = "<option value=''>No WiFiNetwork</option>";
     availableNetworks = "";
+    registeredNetwork = "";
     noNetwork = 0;
 
 }
@@ -162,9 +167,10 @@ string HTMLHandler::getSwitch(bool open) {
 
 void HTMLHandler::replaceString(string &original, const string &toReplace, const string &replacement) {
     size_t start = original.find(toReplace);
-    size_t len = toReplace.length();
-    if (start != string::npos) {
+    while (start != string::npos) {
+        size_t len = toReplace.length();
         original.replace(start, len, replacement);
+        start = original.find(toReplace);
     }
 }
 
