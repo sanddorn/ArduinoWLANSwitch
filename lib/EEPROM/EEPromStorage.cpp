@@ -73,7 +73,7 @@ WifiStorage *EEPromStorage::retrieveNetwork(const char *const ssid) {
     return nullptr;
 }
 
-EEPromStorage::EEPromStorage() : actualData{},  storageIsValid(false), storageIsDirty(false) {
+EEPromStorage::EEPromStorage() : storageIsValid(false), storageIsDirty(false),  actualData{} {
     memcpy(actualData.configValid,"NV",3);
     WifiStorage nullstorage{};
     memset(nullstorage.AccessPointName, '\0', ACCESSPOINT_NAME_LENGTH);
