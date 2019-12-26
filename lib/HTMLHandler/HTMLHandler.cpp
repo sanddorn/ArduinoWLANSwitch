@@ -33,13 +33,22 @@ static string GetEncryptionType(byte thisType) {
 }
 
 string HTMLHandler::getMainPage() {
+    const char *path = "/MainPage.html";
+   return getStaticPage(path);
+}
+
+string HTMLHandler::getWifiSaveDonePage() {
+    const char *path = "/WifiSetupDone.html";
+    return getStaticPage(path);
+}
+
+string HTMLHandler::getStaticPage(const char *path) const {
     if (!spiffsStarted)
         return internalError;
     string mainpage;
-    File mainpageFile = SPIFFS.open("/MainPage.html", "r");
+    File mainpageFile = SPIFFS.open(path, "r");
     Serial.printf("SPIFFS.open returned File: %i\n", mainpageFile.isFile());
     if (mainpageFile.isFile() && mainpageFile.size() > 0) {
-        Serial.printf("Returning Main-file\n");
         mainpage = mainpageFile.readString().c_str();
         mainpageFile.close();
     } else {
@@ -47,7 +56,6 @@ string HTMLHandler::getMainPage() {
     }
     return mainpage;
 }
-
 
 string HTMLHandler::getCss() {
     if (!spiffsStarted)
@@ -119,15 +127,13 @@ string HTMLHandler::getWifiPage() {
     }
     replaceString(wifiPage, "<configuredNetworks/>", registeredNetwork);
     replaceString(wifiPage, "<availableNetworks/>", availableNetworks);
-    if (options.length() > 0) {
-        replaceString(wifiPage, "<networkOtions/>", options);
-    } else {
-        replaceString(wifiPage, "<networkOtions/>", "<option value='No_WiFi_Network'>No WiFiNetwork found </option>");
-    }
+    replaceString(wifiPage, "<networkOtions/>", options);
+    replaceString(wifiPage, "<softapssid>", softAP_SSID);
+    replaceString(wifiPage, "<softappassword>", softAP_SSID);
     return wifiPage;
 }
 
-HTMLHandler::HTMLHandler() : noNetwork(0) {
+HTMLHandler::HTMLHandler() : noNetwork(0), options("<option value=''>No WiFiNetwork</option>") {
     fs::SPIFFSConfig cfg;
     cfg.setAutoFormat(false);
     SPIFFS.setConfig(cfg);
@@ -172,5 +178,9 @@ void HTMLHandler::replaceString(string &original, const string &toReplace, const
         original.replace(start, len, replacement);
         start = original.find(toReplace);
     }
+}
+
+void HTMLHandler::setSoftAPCredentials(const string &ssid) {
+    softAP_SSID = ssid;
 }
 

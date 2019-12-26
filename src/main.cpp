@@ -32,8 +32,8 @@ EEPromStorage storage;
 ESP8266WebServer server(80);
 
 /* Soft AP available_network parameters */
-IPAddress apIP(172, 20, 0, 1);
-IPAddress netMsk(255, 255, 255, 0);
+static IPAddress apIP(172, 20, 0, 1);
+static IPAddress netMsk(255, 255, 255, 0);
 
 
 bool isSoftAP;
@@ -62,6 +62,8 @@ void handleCloseValve();
 
 void handleValveStatus();
 
+void handleFactoryReset();
+
 void scan_completed(int noNetworks);
 
 typedef struct _wifi_info {
@@ -71,7 +73,6 @@ typedef struct _wifi_info {
 } WIFI_INFO;
 
 WIFI_INFO *available_networks;
-
 
 
 void setup() {
@@ -136,6 +137,7 @@ void InitalizeHTTPServer() {
     server.on("/", handleRoot);
     server.on("/wifi", handleWifi);
     server.on("/wifiSetup", handleWifiSetup);
+    server.on("/reset", handleFactoryReset);
     server.on("/Valve/Open", handleOpenValve);
     server.on("/Valve/Close", handleCloseValve);
     server.on("/Valve", handleValveStatus);
@@ -149,7 +151,8 @@ void CreateWifiSoftAP() {
     Serial.print("SoftAP ");
     Serial.printf("SoftAP Settings: '%s' Passwd: '%s'\n", softAP.AccessPointName, softAP.AccessPointPassword);
     WiFi.softAPConfig(apIP, apIP, netMsk);
-    bool SoftAccOK = WiFi.softAP(softAP.AccessPointName, softAP.AccessPointPassword); // Passwortlänge mindestens 8 Zeichen !
+    bool SoftAccOK = WiFi.softAP(softAP.AccessPointName,
+                                 softAP.AccessPointPassword); // Passwortlänge mindestens 8 Zeichen !
     delay(600); // Without delay I've seen the IP address blank
     if (SoftAccOK) {
         Serial.println("SoftAP: OK");
@@ -165,8 +168,9 @@ void CreateWifiSoftAP() {
     WiFi.scanNetworksAsync(scan_completed);
 }
 
-void set_disconnected(const WiFiEventStationModeDisconnected & wiFiEventStationModeDisconnected) {
-    Serial.printf("Disconnected from AP %s for reasonNo %i\n", wiFiEventStationModeDisconnected.ssid.c_str(), wiFiEventStationModeDisconnected.reason);
+void set_disconnected(const WiFiEventStationModeDisconnected &wiFiEventStationModeDisconnected) {
+    Serial.printf("Disconnected from AP %s for reasonNo %i\n", wiFiEventStationModeDisconnected.ssid.c_str(),
+                  wiFiEventStationModeDisconnected.reason);
 }
 
 bool connect_to_wifi(WifiStorage *wifiStorage) {
@@ -239,10 +243,11 @@ void handleWifi() {
         htmlHandler.addRegisteredNetwork(storage.getApSSID(i));
     }
     WIFI_INFO *network = available_networks;
-    while (network->ssid != nullptr) {
+    while (network != nullptr && network->ssid != nullptr) {
         htmlHandler.addAvailableNetwork(network->ssid, network->encryption, network->encryption);
         network++;
     }
+    htmlHandler.setSoftAPCredentials(storage.getSoftAPData().AccessPointName);
     webPage = htmlHandler.getWifiPage().c_str();
     htmlHandler.resetWifiPage();
     server.setContentLength(webPage.length());
@@ -259,16 +264,6 @@ void handleCss() {
 
 
 void handleWifiSetup() {
-    /*
-     *
-WiFi_Add_Network	ssid
-STAWLanPW	asdf
-
-Settings
-
-     */
-
-    // remove unwanted networks from known available_network list
     vector<String> networksToDelete;
     for (int i = 0; i < storage.getNumberOfKnownNetworks(); i++) {
         String networkName = storage.getApSSID(i);
@@ -281,7 +276,7 @@ Settings
         storage.removeWifiNetwork((*iterator).c_str());
     }
     // Add new Network, if any
-    if (server.hasArg("WiFi_Add_Network")) {
+    if (server.hasArg("WiFi_Add_Network") && server.arg("WiFi_Add_Network").length() > 0) {
 
         WifiStorage addNEtwork{};
         strncpy(addNEtwork.AccessPointName, server.arg("WiFi_Add_Network").c_str(), ACCESSPOINT_NAME_LENGTH);
@@ -292,21 +287,30 @@ Settings
         storage.addWifiNetwork(addNEtwork);
     }
 
+    if (server.hasArg("SoftAPSSID") &&
+        strncmp(server.arg("SoftAPSSID").c_str(), storage.getSoftAPData().AccessPointName, ACCESSPOINT_NAME_LENGTH) ==
+        0) {
+        // Set AP Name
+    }
+    // TODO: Password for softap
     server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
-    server.sendHeader("Content-length", "2");
-    // TODO: Maybe redirect?
-    server.send(200, MEDIATYPE_TEXT_PLAIN, "Ok");
+
+    const string &webpage = htmlHandler.getWifiSaveDonePage();
+
+    server.setContentLength(webpage.length());
+    server.send(200, MEDIATYPE_TEXT_HTML, webpage.c_str());
     WiFi.scanDelete();
     WiFi.scanNetworksAsync(scan_completed);
-    // TODO: Settings of local endpoint...
-    /*
-     * APPointName	ESP8266_Config_WLAN
-     * APPW	12345678
-     * APPWRepeat	12345678
-     */
-    // ------- Old impl
+}
+
+void handleFactoryReset() {
+    storage.resetStorage();
+
+    server.sendHeader("Location", String("http://") + server.client().localIP().toString(), true);
+
+    server.send(307, MEDIATYPE_TEXT_PLAIN, "Redirect");
 }
 
 void handleOpenValve() {
@@ -369,7 +373,7 @@ void loop() {
         WiFi.scanDelete();
         WiFi.scanNetworksAsync(scan_completed);
     }
-    if (!isAPAccociated && ! isSoftAP) {
+    if (!isAPAccociated && !isSoftAP) {
         CreateWifiSoftAP();
     }
 

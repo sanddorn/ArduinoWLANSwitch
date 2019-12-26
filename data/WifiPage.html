@@ -44,9 +44,21 @@
             <tr>
                 <td>WiFi Password:</td>
                 <td><label>
-                    <input type='text' name='STAWLanPW' maxlength='40' size='40'>
+                    <input type='text' name='STAWLanPW' maxlength='25' size='25'>
                 </label></td>
             </tr>
+        </table>
+    </div>
+    <div class="networks">
+        <div class="heading">Settings for Soft-AccessPoint</div>
+        <table>
+            <tr>
+                <td>SSID</td><td><input type='text' name="SoftAPSSID" maxlength="20" size="25" value="<softapssid>"></td>
+            </tr>
+            <tr>
+                <td>Password</td><td><input type='password' name="" maxlength="25" size="25" value=""></td>
+            </tr>
+
         </table>
     </div>
     <div class="buttonbox">
@@ -55,12 +67,13 @@
         </button>
         <button type='reset' name='action'>Reset Inputs</button>
     </div>
-    </div>
 </form>
 <h3>Links:</h3>
 <table class="systemlinks">
     <tr>
-        <th><a href='/wifi'>WIFI Settings</a></th>
+        <th><a href='/'>Home</a></th>
+        <th><a href='/wifi'>WIFI Einstellungen</a></th>
+        <th><a href='/reset'>Factory Reset</a></th>
     </tr>
 </table>
 </body>

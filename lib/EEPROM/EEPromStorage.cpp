@@ -66,7 +66,7 @@ WifiStorage *EEPromStorage::retrieveNetwork(const char *const ssid) {
     for (int i = 0; i < actualData.numberOfNets; i++) {
         DEBUG1("checking against %s\n", actualData.knownNets[i].AccessPointName);
         if (memcmp(actualData.knownNets[i].AccessPointName, ssid, MAX_NUMBER_OF_NETS)==0) {
-            DEBUG("Network was found");
+            DEBUG("Network was found\n");
             return &actualData.knownNets[i];
         }
     }
@@ -101,6 +101,7 @@ void EEPromStorage::removeWifiNetwork(const char *const ssid) {
     for (int i = 0; i < actualData.numberOfNets; i++) {
         if (strncmp(actualData.knownNets[i].AccessPointName, ssid, MAX_NUMBER_OF_NETS) == 0) {
             // Move all following members down
+            Serial.printf("Removing entry for ssid: %s\n", actualData.knownNets[i].AccessPointName);
             int j = i + 1;
             while (j < actualData.numberOfNets) {
                 actualData.knownNets[j - 1] = actualData.knownNets[j];
@@ -118,6 +119,6 @@ void EEPromStorage::resetStorage() {
     actualData.numberOfNets=0;
     strncpy(actualData.fallback.AccessPointName, ap_name, ACCESSPOINT_NAME_LENGTH);
     strncpy(actualData.fallback.AccessPointPassword, default_password, WIFI_PASSWORD_LENGTH);
-
+    saveToEEPROM();
 }
 
