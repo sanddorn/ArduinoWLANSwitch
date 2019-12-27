@@ -1,8 +1,10 @@
 #include <string>
-#include <ArduinoUnit.h>
+#include <ArduinoFake.h>
+#include <ArduinoFake.h>
 #include <HTMLHandler.h>
 
 using namespace std;
+using namespace fakeit;
 
 class TestClass :public HTMLHandler {
 public:

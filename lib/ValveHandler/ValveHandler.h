@@ -6,7 +6,6 @@
 #define ARDUINOWLANSWITCH_VALVEHANDLER_H
 
 #include <string>
-#include <HTMLHandler.h>
 #define VALVE_OPEN 0
 #define VALVE_CLOSED 1
 using namespace std;
