@@ -258,7 +258,7 @@ void handleWifi() {
         htmlHandler->addAvailableNetwork(network->ssid, network->encryption, network->encryption);
         network++;
     }
-    htmlHandler->setSoftAPCredentials(storage.getSoftAPData().AccessPointName);
+    htmlHandler->setSoftAPCredentials(storage.getSoftAPData().AccessPointName, storage.getSoftAPData().AccessPointPassword);
     String webPage = htmlHandler->getWifiPage().c_str();
     htmlHandler->resetWifiPage();
     server.setContentLength(webPage.length());
