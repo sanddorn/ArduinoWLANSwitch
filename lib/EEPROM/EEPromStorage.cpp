@@ -4,6 +4,10 @@
 
 #include "EEPromStorage.h"
 
+#ifndef UNIT_TEST
+#include <Arduino.h>
+#include <EEPROM.h>
+
 #define DEBUG(x) Serial.printf(x)
 #define DEBUG1(x, y) Serial.printf(x,y)
 
@@ -65,7 +69,7 @@ WifiStorage *EEPromStorage::retrieveNetwork(const char *const ssid) {
     }
     for (int i = 0; i < actualData.numberOfNets; i++) {
         DEBUG1("checking against %s\n", actualData.knownNets[i].AccessPointName);
-        if (memcmp(actualData.knownNets[i].AccessPointName, ssid, MAX_NUMBER_OF_NETS)==0) {
+        if (memcmp(actualData.knownNets[i].AccessPointName, ssid, MAX_NUMBER_OF_NETS) == 0) {
             DEBUG("Network was found\n");
             return &actualData.knownNets[i];
         }
@@ -73,17 +77,21 @@ WifiStorage *EEPromStorage::retrieveNetwork(const char *const ssid) {
     return nullptr;
 }
 
-EEPromStorage::EEPromStorage() : storageIsValid(false), storageIsDirty(false),  actualData{} {
-    memcpy(actualData.configValid,"NV",3);
+EEPromStorage::EEPromStorage() : storageIsValid(false), storageIsDirty(false), actualData{} {
+    memcpy(actualData.configValid, "NV", 3);
     WifiStorage nullstorage{};
     memset(nullstorage.AccessPointName, '\0', ACCESSPOINT_NAME_LENGTH);
     memset(nullstorage.AccessPointPassword, '\0', WIFI_PASSWORD_LENGTH);
-    for (int i : {0,1,2,3,4}) {
+    for (int i : {0, 1, 2, 3, 4}) {
         actualData.knownNets[i] = nullstorage;
     }
 }
 
-char * EEPromStorage::getApSSID(int i) {
+EEPromStorage::~EEPromStorage() {
+    EEPROM.end();
+}
+
+char *EEPromStorage::getApSSID(int i) {
     if (storageIsValid && i < actualData.numberOfNets) {
         return actualData.knownNets[i].AccessPointName;
     }
@@ -91,7 +99,7 @@ char * EEPromStorage::getApSSID(int i) {
 }
 
 WifiStorage EEPromStorage::getSoftAPData() {
-    if(!storageIsValid) {
+    if (!storageIsValid) {
         initStorage();
     }
     return actualData.fallback;
@@ -116,9 +124,10 @@ void EEPromStorage::resetStorage() {
     actualData.numberOfNets = 0;
     strncpy(actualData.configValid, "NB", 3);
     actualData.numberOfNets = 0;
-    actualData.numberOfNets=0;
+    actualData.numberOfNets = 0;
     strncpy(actualData.fallback.AccessPointName, ap_name, ACCESSPOINT_NAME_LENGTH);
     strncpy(actualData.fallback.AccessPointPassword, default_password, WIFI_PASSWORD_LENGTH);
     saveToEEPROM();
 }
 
+#endif

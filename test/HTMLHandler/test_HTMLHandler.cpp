@@ -2,42 +2,211 @@
 // Created by Nils Bokermann on 29.11.19.
 //
 
-#define WiFi_h
-#define FS_H
 
-enum wl_enc_type {  /* Values map to 802.11 encryption suites... */
-    ENC_TYPE_WEP = 5,
-    ENC_TYPE_TKIP = 2,
-    ENC_TYPE_CCMP = 4,
-    /* ... except these two, 7 and 8 are reserved in 802.11-2007 */
-            ENC_TYPE_NONE = 7,
-    ENC_TYPE_AUTO = 8
+#include <string>
+#include "test_HTMLHandler.h"
+
+using namespace fakeit;
+using namespace std;
+
+class MockStorage : public StorageBlob {
+public:
+    MockStorage(std::string storage) : store(storage) {};
+
+    virtual ~MockStorage() = default;
+
+    virtual size_t size() const { return store.length(); };
+
+    virtual void close() {};
+
+    virtual bool isFile() const { return true; };
+
+    virtual std::string readString() { return store; };
+
+private:
+    std::string store;
 };
 
-namespace fs {
-    class SPIFFSConfig {
-    public:
-        SPIFFSConfig(bool autoFormat = true) {}
-    };
+namespace TestHtmlHandler {
+    HTMLHandler *subjectUnderTest;
+    Logging logging;
+    Mock <Persistence> persistenceMock;
 
-    class File {
+    void setUp() {
+        Persistence &persistence = persistenceMock.get();
+        When(Method(persistenceMock, begin)).Return(true);
+        subjectUnderTest = new HTMLHandler(&persistence, &logging);
+    }
 
-    };
+    void test_getMainPage() {
+        persistenceMock.ClearInvocationHistory();
+        string original = "Mainpage_Mock";
+        std::shared_ptr <MockStorage> storage(new MockStorage(original));
+        Mock <MockStorage> fileMock(*storage);
+        Spy(Method(fileMock, isFile));
+        Spy(Method(fileMock, size));
+        Spy(Method(fileMock, readString));
+        When(Method(persistenceMock, open)).Return(storage);
+        string mainpage;
+        try {
+            mainpage = subjectUnderTest->getMainPage();
+            Verify(Method(persistenceMock, open).Using("/MainPage.html", "r")).Once();
+            Verify(Method(fileMock, isFile)).Exactly(2);
+            Verify(Method(fileMock, size)).Once();
+            Verify(Method(fileMock, readString)).Once();
+        } catch (UnexpectedMethodCallException e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_TRUE(original.compare(mainpage) == 0);
+    }
 
-    class FS {
-    public:
+    void test_getCSS() {
+        persistenceMock.ClearInvocationHistory();
+        string original = "CSS";
+        std::shared_ptr <MockStorage> storage(new MockStorage(original));
+        Mock <MockStorage> fileMock(*storage);
+        Spy(Method(fileMock, isFile));
+        Spy(Method(fileMock, size));
+        Spy(Method(fileMock, readString));
+        When(Method(persistenceMock, open)).Return(storage);
+        string mainpage;
+        try {
+            mainpage = subjectUnderTest->getCss();
+            Verify(Method(persistenceMock, open).Using("/portal.css", "r")).Once();
+            Verify(Method(fileMock, isFile)).Exactly(2);
+            Verify(Method(fileMock, size)).Once();
+            Verify(Method(fileMock, readString)).Once();
+        } catch (UnexpectedMethodCallException e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_TRUE(original.compare(mainpage) == 0);
+    }
 
-        bool setConfig(const SPIFFSConfig &cfg);
+    void test_getWifiSaveDonePage() {
+        persistenceMock.ClearInvocationHistory();
+        string original = "WifiSaveDone";
+        std::shared_ptr <MockStorage> storage(new MockStorage(original));
+        Mock <MockStorage> fileMock(*storage);
+        Spy(Method(fileMock, isFile));
+        Spy(Method(fileMock, size));
+        Spy(Method(fileMock, readString));
+        When(Method(persistenceMock, open)).Return(storage);
+        string mainpage;
+        try {
+            mainpage = subjectUnderTest->getCss();
+            Verify(Method(persistenceMock, open).Using("/portal.css", "r")).Once();
+            Verify(Method(fileMock, isFile)).Exactly(2);
+            Verify(Method(fileMock, size)).Once();
+            Verify(Method(fileMock, readString)).Once();
+        } catch (UnexpectedMethodCallException e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_TRUE(original.compare(mainpage) == 0);
+    }
 
-        bool begin();
+    void test_addAvailableNetwork() {
+        persistenceMock.ClearInvocationHistory();
+        string wifiString = "<availableNetworks/>";
+        string partial = "Number: '<number/>' SSID: '<ssid/>' encryption: '<encryption/>' strength: '<strength/>'";
+        std::shared_ptr <MockStorage> partialFile(new MockStorage(partial));
+        std::shared_ptr <MockStorage> wifiFile(new MockStorage(wifiString));
+        When(Method(persistenceMock, open).Using("/AvailableNetwork.partial", "r")).Return(partialFile);
+        When(Method(persistenceMock, open).Using("/WifiPage.html","r")).Return(wifiFile);
+        string mainpage;
+        try {
+            subjectUnderTest->addAvailableNetwork("ssid", 4, 42);
+            mainpage = subjectUnderTest->getWifiPage();
+            subjectUnderTest->resetWifiPage();
+        } catch (UnexpectedMethodCallException e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_TRUE(mainpage.compare("Number: '1' SSID: 'ssid' encryption: 'WPA2' strength: '42'") == 0);
+    }
 
-        void end();
+    void test_addAvailableNetworkWithTwoNetworks() {
+        persistenceMock.ClearInvocationHistory();
+        string wifiString = "<availableNetworks/>";
+        string partial = "Number: '<number/>' SSID: '<ssid/>' encryption: '<encryption/>' strength: '<strength/>'";
+        std::shared_ptr <MockStorage> partialFile(new MockStorage(partial));
+        std::shared_ptr <MockStorage> wifiFile(new MockStorage(wifiString));
+        When(Method(persistenceMock, open).Using("/AvailableNetwork.partial", "r")).AlwaysReturn(partialFile);
+        When(Method(persistenceMock, open).Using("/WifiPage.html","r")).Return(wifiFile);
+        string mainpage;
+        try {
+            subjectUnderTest->addAvailableNetwork("ssid", 4, 42);
+            subjectUnderTest->addAvailableNetwork("ssid2", 4, 43);
+            mainpage = subjectUnderTest->getWifiPage();
+            subjectUnderTest->resetWifiPage();
+        } catch (UnexpectedMethodCallException e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_TRUE(mainpage.compare("Number: '1' SSID: 'ssid' encryption: 'WPA2' strength: '42'Number: '2' SSID: 'ssid2' encryption: 'WPA2' strength: '43'") == 0);
+    }
 
-        File open(const char *path, const char *mode);
+    void test_addAvailableNetworkOptions() {
+        persistenceMock.ClearInvocationHistory();
+        string wifiString = "<networkOptions/>";
+        string partial = "Number: '<number/>' SSID: '<ssid/>' encryption: '<encryption/>' strength: '<strength/>'";
+        std::shared_ptr <MockStorage> partialFile(new MockStorage(partial));
+        std::shared_ptr <MockStorage> wifiFile(new MockStorage(wifiString));
+        When(Method(persistenceMock, open).Using("/AvailableNetwork.partial", "r")).AlwaysReturn(partialFile);
+        When(Method(persistenceMock, open).Using("/WifiPage.html","r")).Return(wifiFile);
+        string mainpage;
+        try {
+            subjectUnderTest->addAvailableNetwork("ssid", 4, 42);
+            subjectUnderTest->addAvailableNetwork("ssid2", 4, 43);
+            mainpage = subjectUnderTest->getWifiPage();
+            subjectUnderTest->resetWifiPage();
+        } catch (UnexpectedMethodCallException e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_TRUE(mainpage.compare("<option value=''>No WiFiNetwork</option><option value='ssid'>ssid</option><option value='ssid2'>ssid2</option>") == 0);
+    }
 
-    };
-};
+    void test_addConfiguredNetworks() {
+        persistenceMock.ClearInvocationHistory();
+        string wifiString = "<configuredNetworks/>";
+        string partial = "SSID: '<ssid/>' ";
+        std::shared_ptr <MockStorage> partialFile(new MockStorage(partial));
+        std::shared_ptr <MockStorage> wifiFile(new MockStorage(wifiString));
+        When(Method(persistenceMock, open).Using("/RegisteredNetwork.partial", "r")).AlwaysReturn(partialFile);
+        When(Method(persistenceMock, open).Using("/WifiPage.html","r")).Return(wifiFile);
+        string mainpage;
+        try {
+            subjectUnderTest->addRegisteredNetwork("ssid");
+            mainpage = subjectUnderTest->getWifiPage();
+            subjectUnderTest->resetWifiPage();
+        } catch (UnexpectedMethodCallException e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_TRUE(mainpage.compare("SSID: 'ssid' ") == 0);
+    }
 
 
-fs::FS SPIFFS;
+    void test_softAPCredentials() {
+        persistenceMock.ClearInvocationHistory();
+        string wifiString = "SSID: '<softapssid/>' Password: '<softappassword>";
+        std::shared_ptr <MockStorage> wifiFile(new MockStorage(wifiString));
+        When(Method(persistenceMock, open).Using("/WifiPage.html","r")).Return(wifiFile);
+        string mainpage;
+        try {
+            subjectUnderTest->setSoftAPCredentials("ssid", "password");
+            mainpage = subjectUnderTest->getWifiPage();
+            subjectUnderTest->resetWifiPage();
+        } catch (UnexpectedMethodCallException e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_TRUE(mainpage.compare("SSID: 'ssid' Password: 'password") == 0);
 
+    }
+
+    void run_tests() {
+        RUN_TEST(test_getMainPage);
+        RUN_TEST(test_getCSS);
+        RUN_TEST(test_getWifiSaveDonePage);
+        RUN_TEST(test_addAvailableNetwork);
+        RUN_TEST(test_addAvailableNetworkWithTwoNetworks);
+        RUN_TEST(test_addAvailableNetworkOptions);
+        RUN_TEST(test_addConfiguredNetworks);
+    }
+}

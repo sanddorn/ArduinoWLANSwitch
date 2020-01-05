@@ -2,7 +2,9 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <DNSServer.h>
+#include <ArduinoLog.h>
 #include "../lib/EEPROM/EEPromStorage.h"
+#include "../lib/HTMLHandler/FS_Persistence.h"
 #include "../lib/HTMLHandler/HTMLHandler.h"
 #include <ArduinoOTA.h>
 #include <FS.h>
@@ -22,7 +24,9 @@ const byte DNS_PORT = 53;
 
 DNSServer dnsServer;
 
-HTMLHandler htmlHandler;
+Logging logging;
+
+HTMLHandler *htmlHandler;
 
 ValveHandler valveHandler(VALVE_PORT);
 
@@ -82,6 +86,14 @@ void setup() {
     Serial.begin(115200);
     Serial.println("booting");
     isSoftAP = false;
+
+    fs::SPIFFSConfig cfg;
+    cfg.setAutoFormat(false);
+    SPIFFS.setConfig(cfg);
+    auto *persistence = new FS_Persistence(&SPIFFS);
+
+    logging.begin(LOG_LEVEL_VERBOSE, &Serial);
+    htmlHandler = new HTMLHandler(persistence, &logging);
     storage.initStorage();
 //    storage.resetStorage();
     WiFi.hostname(ESPHostname); // Set the DHCP hostname assigned to ESP station.
@@ -218,7 +230,7 @@ void handleRoot() {
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
     // HTML Content
-    const String &webPage = htmlHandler.getMainPage().c_str();
+    const String &webPage = htmlHandler->getMainPage().c_str();
     server.setContentLength(webPage.length());
     server.send(200, MEDIATYPE_TEXT_HTML, webPage);
 }
@@ -234,22 +246,21 @@ void handleNotFound() {
 
 /** Wifi config page handler */
 void handleWifi() {
-    String webPage = "";
     server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
 
     for (int i = 0; i < storage.getNumberOfKnownNetworks(); i++) {
-        htmlHandler.addRegisteredNetwork(storage.getApSSID(i));
+        htmlHandler->addRegisteredNetwork(storage.getApSSID(i));
     }
     WIFI_INFO *network = available_networks;
     while (network != nullptr && network->ssid != nullptr) {
-        htmlHandler.addAvailableNetwork(network->ssid, network->encryption, network->encryption);
+        htmlHandler->addAvailableNetwork(network->ssid, network->encryption, network->encryption);
         network++;
     }
-    htmlHandler.setSoftAPCredentials(storage.getSoftAPData().AccessPointName);
-    webPage = htmlHandler.getWifiPage().c_str();
-    htmlHandler.resetWifiPage();
+    htmlHandler->setSoftAPCredentials(storage.getSoftAPData().AccessPointName);
+    String webPage = htmlHandler->getWifiPage().c_str();
+    htmlHandler->resetWifiPage();
     server.setContentLength(webPage.length());
     server.send(200, MEDIATYPE_TEXT_HTML, webPage);
 
@@ -257,7 +268,7 @@ void handleWifi() {
 
 
 void handleCss() {
-    String cssString = htmlHandler.getCss().c_str();
+    String cssString = htmlHandler->getCss().c_str();
     server.setContentLength(cssString.length());
     server.send(200, "text/css", cssString);
 }
@@ -297,7 +308,7 @@ void handleWifiSetup() {
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
 
-    const string &webpage = htmlHandler.getWifiSaveDonePage();
+    const string &webpage = htmlHandler->getWifiSaveDonePage();
 
     server.setContentLength(webpage.length());
     server.send(200, MEDIATYPE_TEXT_HTML, webpage.c_str());
@@ -314,21 +325,21 @@ void handleFactoryReset() {
 }
 
 void handleOpenValve() {
-    String page = htmlHandler.getSwitch(true).c_str();
+    String page = htmlHandler->getSwitch(true).c_str();
     server.setContentLength(page.length());
     server.send(200, MEDIATYPE_TEXT_HTML, page);
     valveHandler.openValve();
 }
 
 void handleCloseValve() {
-    String page = htmlHandler.getSwitch(false).c_str();
+    String page = htmlHandler->getSwitch(false).c_str();
     server.setContentLength(page.length());
     server.send(200, MEDIATYPE_TEXT_HTML, page);
     valveHandler.closeValve();
 }
 
 void handleValveStatus() {
-    String page = htmlHandler.getSwitch(valveHandler.getStatus() == VALVE_OPEN).c_str();
+    String page = htmlHandler->getSwitch(valveHandler.getStatus() == VALVE_OPEN).c_str();
     server.setContentLength(page.length());
     server.send(200, MEDIATYPE_TEXT_HTML, page);
 }

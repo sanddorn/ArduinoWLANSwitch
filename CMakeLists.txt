@@ -6,7 +6,7 @@
 # The `CMakeListsUser.txt` will not be overwritten by PlatformIO.
 
 cmake_minimum_required(VERSION 3.2)
-project("ArduinoWLANSwitch")
+project("ESP8266_WLAN_Schalter")
 
 include(CMakeListsPrivate.txt)
 

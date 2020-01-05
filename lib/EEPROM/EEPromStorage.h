@@ -8,8 +8,6 @@
 #define WIFI_PASSWORD_LENGTH 25
 #define ACCESSPOINT_NAME_LENGTH 20
 
-#include <Arduino.h>
-#include <EEPROM.h>
 #include <string>
 
 #define MAX_NUMBER_OF_NETS 5
@@ -25,9 +23,7 @@ class EEPromStorage {
 public:
     EEPromStorage();
 
-    ~EEPromStorage() {
-        EEPROM.end();
-    };
+    ~EEPromStorage();
 
     int getNumberOfKnownNetworks();
 
