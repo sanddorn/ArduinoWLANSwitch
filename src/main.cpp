@@ -79,6 +79,10 @@ typedef struct _wifi_info {
 WIFI_INFO *available_networks;
 
 
+void sendCR(Print * p) {
+    p->print(CR);
+}
+
 void setup() {
     pinMode(VALVE_PORT, OUTPUT);
     pinMode(TRIGGER_PORT, INPUT);
@@ -93,6 +97,7 @@ void setup() {
     auto *persistence = new FS_Persistence(&SPIFFS);
 
     logging.begin(LOG_LEVEL_VERBOSE, &Serial);
+    logging.setSuffix(sendCR);
     htmlHandler = new HTMLHandler(persistence, &logging);
     storage.initStorage();
 //    storage.resetStorage();

@@ -6,15 +6,7 @@
 #define ARDUINOWLANSWITCH_HTMLHANDLER_H
 
 #include <string>
-// Workaround for ArduinoLog in native test.
-#ifndef ARDUINO
-#define ARDUINO 1001
-#define UNSET_ARDUINO
-#endif // ARDUINO
 #include <ArduinoLog.h>
-#ifdef UNSET_ARDUINO
-#undef ARDUINO
-#endif // UNSET_ARDUINO
 #include "AbstractPersistence.h"
 
 #define MEDIATYPE_TEXT_HTML "text/html"
