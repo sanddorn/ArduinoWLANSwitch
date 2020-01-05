@@ -9,7 +9,6 @@
 #include <utility>
 
 #include "AbstractPersistence.h"
-#include "../../../../.platformio/packages/framework-arduinoespressif8266/cores/esp8266/FS.h"
 #include <FS.h>
 
 class FileStorage : public StorageBlob {
