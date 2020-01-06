@@ -50,6 +50,7 @@ namespace TestHtmlHandler {
         string mainpage;
         try {
             mainpage = subjectUnderTest->getMainPage();
+            TEST_ASSERT_TRUE(original.compare(mainpage) == 0);
             Verify(Method(persistenceMock, open).Using("/MainPage.html", "r")).Once();
             Verify(Method(fileMock, isFile)).Exactly(2);
             Verify(Method(fileMock, size)).Once();
@@ -57,7 +58,6 @@ namespace TestHtmlHandler {
         } catch (UnexpectedMethodCallException e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
-        TEST_ASSERT_TRUE(original.compare(mainpage) == 0);
     }
 
     void test_getCSS() {
