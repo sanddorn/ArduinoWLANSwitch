@@ -10,7 +10,7 @@ install:
 - platformio update
 script:
 - platformio run
-- platformio test -e native
+- platformio test -e native -v
 notifications:
   slack:
     on_error: always
