@@ -4,11 +4,12 @@
 #include <DNSServer.h>
 #include <ArduinoLog.h>
 #include "WifiConfigStorage.h"
-#include "../lib/HTMLHandler/FS_Persistence.h"
-#include "../lib/HTMLHandler/HTMLHandler.h"
+#include "FS_Persistence.h"
+#include "HTMLHandler.h"
 #include <ArduinoOTA.h>
 #include <FS.h>
-#include "../lib/ValveHandler/ValveHandler.h"
+#include "ValveHandler.h"
+#include "EEPROMWifiStorage.h"
 
 
 #define VALVE_PORT 13
@@ -30,8 +31,8 @@ HTMLHandler *htmlHandler;
 
 ValveHandler valveHandler(VALVE_PORT);
 
-WifiConfigStorage storage;
-
+WifiConfigStorage *storage;
+EEPROMWifiStorage eepromStorage;
 // Web server
 ESP8266WebServer server(80);
 
@@ -99,8 +100,9 @@ void setup() {
     logging.begin(LOG_LEVEL_VERBOSE, &Serial);
     logging.setSuffix(sendCR);
     htmlHandler = new HTMLHandler(persistence, &logging);
-    storage.initStorage();
-//    storage.resetStorage();
+    storage = new WifiConfigStorage(&logging, &eepromStorage);
+    storage->initStorage();
+//    storage->resetStorage();
     WiFi.hostname(ESPHostname); // Set the DHCP hostname assigned to ESP station.
     Serial.setDebugOutput(true); //Debug Output for WLAN on Serial Interface.
     available_networks = nullptr;
@@ -143,7 +145,7 @@ void startWifi() {
         Serial.println("Wifi Setup Succes");
     } else {
         Serial.println("No SoftAP or STA could be started. Resetting to default");
-        storage.resetStorage();
+        storage->resetStorage();
     }
     InitalizeHTTPServer();
 
@@ -164,7 +166,7 @@ void InitalizeHTTPServer() {
 }
 
 void CreateWifiSoftAP() {
-    WifiStorage softAP = storage.getSoftAPData();
+    WifiStorage softAP = storage->getSoftAPData();
     Serial.print("SoftAP ");
     Serial.printf("SoftAP Settings: '%s' Passwd: '%s'\n", softAP.AccessPointName, softAP.AccessPointPassword);
     WiFi.softAPConfig(apIP, apIP, netMsk);
@@ -255,15 +257,15 @@ void handleWifi() {
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "-1");
 
-    for (int i = 0; i < storage.getNumberOfKnownNetworks(); i++) {
-        htmlHandler->addRegisteredNetwork(storage.getApSSID(i));
+    for (int i = 0; i < storage->getNumberOfKnownNetworks(); i++) {
+        htmlHandler->addRegisteredNetwork(storage->getApSSID(i));
     }
     WIFI_INFO *network = available_networks;
     while (network != nullptr && network->ssid != nullptr) {
         htmlHandler->addAvailableNetwork(network->ssid, network->encryption, network->encryption);
         network++;
     }
-    htmlHandler->setSoftAPCredentials(storage.getSoftAPData().AccessPointName, storage.getSoftAPData().AccessPointPassword);
+    htmlHandler->setSoftAPCredentials(storage->getSoftAPData().AccessPointName, storage->getSoftAPData().AccessPointPassword);
     String webPage = htmlHandler->getWifiPage().c_str();
     htmlHandler->resetWifiPage();
     server.setContentLength(webPage.length());
@@ -281,15 +283,15 @@ void handleCss() {
 
 void handleWifiSetup() {
     vector<String> networksToDelete;
-    for (int i = 0; i < storage.getNumberOfKnownNetworks(); i++) {
-        String networkName = storage.getApSSID(i);
+    for (int i = 0; i < storage->getNumberOfKnownNetworks(); i++) {
+        String networkName = storage->getApSSID(i);
         networkName += +"_delete";
         if (server.hasArg(networkName) && server.arg(networkName).equals("on")) {
-            networksToDelete.emplace_back(storage.getApSSID(i));
+            networksToDelete.emplace_back(storage->getApSSID(i));
         }
     }
     for (auto iterator = networksToDelete.begin(); iterator < networksToDelete.end(); iterator++) {
-        storage.removeWifiNetwork((*iterator).c_str());
+        storage->removeWifiNetwork((*iterator).c_str());
     }
     // Add new Network, if any
     if (server.hasArg("WiFi_Add_Network") && server.arg("WiFi_Add_Network").length() > 0) {
@@ -300,11 +302,11 @@ void handleWifiSetup() {
             strncpy(addNEtwork.AccessPointPassword, server.arg("STAWLanPW").c_str(), WIFI_PASSWORD_LENGTH);
         }
         Serial.printf("Add available_network: '%s':'%s\n", addNEtwork.AccessPointName, addNEtwork.AccessPointPassword);
-        storage.addWifiNetwork(addNEtwork);
+        storage->addWifiNetwork(addNEtwork);
     }
 
     if (server.hasArg("SoftAPSSID") &&
-        strncmp(server.arg("SoftAPSSID").c_str(), storage.getSoftAPData().AccessPointName, ACCESSPOINT_NAME_LENGTH) ==
+        strncmp(server.arg("SoftAPSSID").c_str(), storage->getSoftAPData().AccessPointName, ACCESSPOINT_NAME_LENGTH) ==
         0) {
         // Set AP Name
     }
@@ -322,7 +324,7 @@ void handleWifiSetup() {
 }
 
 void handleFactoryReset() {
-    storage.resetStorage();
+    storage->resetStorage();
 
     server.sendHeader("Location", String("http://") + server.client().localIP().toString(), true);
 
@@ -373,7 +375,7 @@ void loop() {
     while (!isAPAccociated && network != nullptr && network->ssid != nullptr) {
         Serial.printf("Checking for known networks\n");
         Serial.printf("Checking for ssid: %s\n", network->ssid);
-        WifiStorage *wifi = storage.retrieveNetwork(network->ssid);
+        WifiStorage *wifi = storage->retrieveNetwork(network->ssid);
 
         if (wifi != nullptr) {
             if (connect_to_wifi(wifi)) {

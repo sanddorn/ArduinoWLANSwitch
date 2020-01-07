@@ -2,12 +2,14 @@
 // Created by nilsb on 07.01.20.
 //
 
+#include <Arduino.h>
+#include <unity.h>
+
 #include "test_WifiConfig.h"
-#include "../../lib/WifiConfig/AbstractWifiStorage.h"
 #include <WifiConfigStorage.h>
-#include <string.h>
+#include <cstring>
 
-
+using namespace fakeit;
 namespace TestWifiConfig {
     WifiConfigStorage *subjectUnderTest;
     Logging logging;
@@ -23,20 +25,19 @@ namespace TestWifiConfig {
             wifiStorage.knownNets[i] = nullstorage;
         }
         AbstractWifiStorage &persistence = storage.get();
-        subjectUnderTest = new WifiConfigStorage(&persistence, &logging);
+        subjectUnderTest = new WifiConfigStorage(&logging, &persistence);
     }
 
 
     void test_initStorage() {
         When(Method(storage, begin)).Return();
-        When(Method(storage, get)).AlwaysDo([](auto& t) {
-            result = wifiStorage
-            return true;
+        When(Method(storage, get)).AlwaysDo([](StorageData& result) {
+            result = wifiStorage;
         });
         subjectUnderTest->initStorage();
     }
 
     void run_tests() {
-        RUN_TEST(test_getMainPage);
+        RUN_TEST(test_initStorage);
     }
 }

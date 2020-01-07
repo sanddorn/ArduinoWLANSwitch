@@ -3,6 +3,7 @@
 //
 
 #include "EEPROMWifiStorage.h"
+#ifndef UNIT_TEST
 
 void EEPROMWifiStorage::begin() {
     EEPROM.begin(storage_size);
@@ -24,3 +25,5 @@ void EEPROMWifiStorage::get(StorageData &t) {
 void EEPROMWifiStorage::put(const StorageData &t) {
     EEPROM.put(0,t);
 }
+
+#endif //UNIT_TEST

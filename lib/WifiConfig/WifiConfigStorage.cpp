@@ -4,7 +4,6 @@
 
 #include "WifiConfigStorage.h"
 
-#ifndef UNIT_TEST
 #include <Arduino.h>
 
 
@@ -36,9 +35,9 @@ void WifiConfigStorage::saveToEEPROM() {
     storage->put(actualData);
     if (storage->commit()) {
         storageIsDirty = false;
-        Serial.printf("EEPROM successfully updated\n");
+        log->trace("EEPROM successfully updated");
     } else {
-        Serial.printf("EEPROM could not be updated\n");
+        log->trace("EEPROM could not be updated");
         storageIsValid = false;
     }
 }
@@ -107,7 +106,7 @@ void WifiConfigStorage::removeWifiNetwork(const char *const ssid) {
     for (int i = 0; i < actualData.numberOfNets; i++) {
         if (strncmp(actualData.knownNets[i].AccessPointName, ssid, MAX_NUMBER_OF_NETS) == 0) {
             // Move all following members down
-            Serial.printf("Removing entry for ssid: %s\n", actualData.knownNets[i].AccessPointName);
+            log->trace("Removing entry for ssid: %s", actualData.knownNets[i].AccessPointName);
             int j = i + 1;
             while (j < actualData.numberOfNets) {
                 actualData.knownNets[j - 1] = actualData.knownNets[j];
@@ -128,4 +127,3 @@ void WifiConfigStorage::resetStorage() {
     saveToEEPROM();
 }
 
-#endif

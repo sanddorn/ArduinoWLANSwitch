@@ -12,7 +12,7 @@ namespace TestReplaceString {
 
     class TestClass : public HTMLHandler {
     public:
-        TestClass(Persistence * persistence, Logging *log) : HTMLHandler(persistence, log) {};
+        TestClass(FilePersistence * persistence, Logging *log) : HTMLHandler(persistence, log) {};
 
         void replaceString(string &original, const string &toReplace, const string replacement) {
             HTMLHandler::replaceString(original, toReplace, replacement);
@@ -22,10 +22,10 @@ namespace TestReplaceString {
 
     TestClass *subjectUnderTest;
     Logging logging;
-    Mock <Persistence> persistenceMock;
+    Mock <FilePersistence> persistenceMock;
 
     void setUp() {
-        Persistence &persistence = persistenceMock.get();
+        FilePersistence &persistence = persistenceMock.get();
         When(Method(persistenceMock, begin)).Return(true);
         subjectUnderTest = new TestClass(&persistence, &logging);
     }
