@@ -93,8 +93,8 @@ namespace TestHtmlHandler {
         When(Method(persistenceMock, open)).Return(storage);
         string mainpage;
         try {
-            mainpage = subjectUnderTest->getCss();
-            Verify(Method(persistenceMock, open).Using("/portal.css", "r")).Once();
+            mainpage = subjectUnderTest->getWifiSaveDonePage();
+            Verify(Method(persistenceMock, open).Using("/WifiSetupDone.html", "r")).Once();
             Verify(Method(fileMock, isFile)).Exactly(2);
             Verify(Method(fileMock, size)).Once();
             Verify(Method(fileMock, readString)).Once();
@@ -189,7 +189,7 @@ namespace TestHtmlHandler {
 
     void test_softAPCredentials() {
         persistenceMock.ClearInvocationHistory();
-        string wifiString = "SSID: '<softapssid/>' Password: '<softappassword>";
+        string wifiString = "SSID: '<softapssid>' Password: '<softappassword>";
         std::shared_ptr <MockStorage> wifiFile(new MockStorage(wifiString));
         When(Method(persistenceMock, open).Using("/WifiPage.html", "r")).Return(wifiFile);
         string mainpage;
@@ -201,7 +201,36 @@ namespace TestHtmlHandler {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
         TEST_ASSERT_TRUE(mainpage.compare("SSID: 'ssid' Password: 'password") == 0);
+    }
 
+    void test_getSwitchOpen() {
+        persistenceMock.ClearInvocationHistory();
+        string webPage = "&#x274C; The valve is closed";
+        std::shared_ptr <MockStorage> storage(new MockStorage(webPage));
+        When(Method(persistenceMock, open)).Return(storage);
+        string mainpage;
+        try {
+            mainpage = subjectUnderTest->getSwitch(true);
+            subjectUnderTest->resetWifiPage();
+        } catch (UnexpectedMethodCallException e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_TRUE(mainpage.compare("&#x274E; The valve is open") == 0);
+    }
+
+    void test_getSwitchClosed() {
+        persistenceMock.ClearInvocationHistory();
+        string webPage = "&#x274C; The valve is closed";
+        std::shared_ptr <MockStorage> storage(new MockStorage(webPage));
+        When(Method(persistenceMock, open)).Return(storage);
+        string mainpage;
+        try {
+            mainpage = subjectUnderTest->getSwitch(false);
+            subjectUnderTest->resetWifiPage();
+        } catch (UnexpectedMethodCallException e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_TRUE(mainpage.compare("&#x274C; The valve is closed") == 0);
     }
 
     void run_tests() {
@@ -212,5 +241,8 @@ namespace TestHtmlHandler {
         RUN_TEST(test_addAvailableNetworkWithTwoNetworks);
         RUN_TEST(test_addAvailableNetworkOptions);
         RUN_TEST(test_addConfiguredNetworks);
+        RUN_TEST(test_softAPCredentials);
+        RUN_TEST(test_getSwitchOpen);
+        RUN_TEST(test_getSwitchClosed);
     }
 }
