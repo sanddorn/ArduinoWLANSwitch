@@ -12,6 +12,7 @@ install:
 script:
 - platformio run
 - platformio test -e native -v
+- mkdir -p docs/coverage
 - gcovr --html-details --exclude .pio --exclude test --output docs/coverage/coverage.html
 # todo: Add github pages and upload.
 notifications:
