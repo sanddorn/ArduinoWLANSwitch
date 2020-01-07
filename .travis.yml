@@ -7,14 +7,17 @@ cache:
   - "~/.platformio"
 install:
 - pip install -U platformio
+- pip install gcovr
 - platformio update
 script:
 - platformio run
 - platformio test -e native -v
+- gcovr --html-details --exclude .pio --exclude test --output docs/coverage/coverage.html
+# todo: Add github pages and upload.
 notifications:
   slack:
     on_error: always
     on_failure: always
     on_success: change
     rooms:
-      secure: kvFz22Q1CPE1TCOb2GFhOyMZRWgBTkNllMr+1Zr6RHyZ0QUnZS4A2jQQQDTQxI/6SXE7mblvnwSQVBFyeG42+GYYGnfk8ZEnF/oxcBLoZDxQKDYqgh9OLC3vMTDjrTLoxtwcmj8wbu0LlolODQ8AuopruqMSQK8JpwFGIkocA7COViQ/ks0mjzy1u5ZsrIYcFzWC7pRNnWCda9QNnaE95+k9/Am8tuJEesL7NU+Mp4Hyun710sgrf1ZfLFfpxa7yySYg569u+q+6uusnW+VQJvGxogD2FSl1/5tBtHkblDNxjxTE3Dknb4+K2rlfd7v9r35pmzL/eua7qkg0V0hPodVmlcVo3VEhNo4zONipODcbVWQCSoCcPwd6Q5jyMyDb5bFmJ8GvTIvBRHNSJglCEv+k+cLYwJ+NdBZZUR+35un5hBW3YqNpDaTlnKx3L7Bwhxh54Iy/mA7AIS6CGhWr6f+yY7nn5hxNWNdaPI9QQQFOL3fOqnipcRTH519uloR9Sqc96pLzushNX2hvx4rCAP5cqIEb58IpdqEAkSXbMRrTdMiDDqz+MSq29cyXHeFnReZm1hOXrVkPw9B4REzDJpDA2L/Yt2mtzVTRLQA4yvQBo4bDvKyExQFCLkd31V3s/9jkx0HOpBnzdgjApm01n7r9ONKsgq1uMwOBVY9e9hY=
+    - secure: kvFz22Q1CPE1TCOb2GFhOyMZRWgBTkNllMr+1Zr6RHyZ0QUnZS4A2jQQQDTQxI/6SXE7mblvnwSQVBFyeG42+GYYGnfk8ZEnF/oxcBLoZDxQKDYqgh9OLC3vMTDjrTLoxtwcmj8wbu0LlolODQ8AuopruqMSQK8JpwFGIkocA7COViQ/ks0mjzy1u5ZsrIYcFzWC7pRNnWCda9QNnaE95+k9/Am8tuJEesL7NU+Mp4Hyun710sgrf1ZfLFfpxa7yySYg569u+q+6uusnW+VQJvGxogD2FSl1/5tBtHkblDNxjxTE3Dknb4+K2rlfd7v9r35pmzL/eua7qkg0V0hPodVmlcVo3VEhNo4zONipODcbVWQCSoCcPwd6Q5jyMyDb5bFmJ8GvTIvBRHNSJglCEv+k+cLYwJ+NdBZZUR+35un5hBW3YqNpDaTlnKx3L7Bwhxh54Iy/mA7AIS6CGhWr6f+yY7nn5hxNWNdaPI9QQQFOL3fOqnipcRTH519uloR9Sqc96pLzushNX2hvx4rCAP5cqIEb58IpdqEAkSXbMRrTdMiDDqz+MSq29cyXHeFnReZm1hOXrVkPw9B4REzDJpDA2L/Yt2mtzVTRLQA4yvQBo4bDvKyExQFCLkd31V3s/9jkx0HOpBnzdgjApm01n7r9ONKsgq1uMwOBVY9e9hY=
