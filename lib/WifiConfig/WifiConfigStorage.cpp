@@ -2,24 +2,21 @@
 // Created by Nils Bokermann on 19.11.19.
 //
 
-#include "EEPromStorage.h"
+#include "WifiConfigStorage.h"
 
 #ifndef UNIT_TEST
 #include <Arduino.h>
-#include <EEPROM.h>
 
-#define DEBUG(x) Serial.printf(x)
-#define DEBUG1(x, y) Serial.printf(x,y)
 
 static const char *const ap_name = "ESP8266_Config_WLAN";
 
 static const char *const default_password = "12345678";
 
-int EEPromStorage::getNumberOfKnownNetworks() {
+int WifiConfigStorage::getNumberOfKnownNetworks() {
     return storageIsValid ? actualData.numberOfNets : -1;
 }
 
-void EEPromStorage::addWifiNetwork(WifiStorage newNetwork) {
+void WifiConfigStorage::addWifiNetwork(WifiStorage newNetwork) {
     if (!storageIsValid) {
         initStorage();
     }
@@ -34,10 +31,10 @@ void EEPromStorage::addWifiNetwork(WifiStorage newNetwork) {
     saveToEEPROM();
 }
 
-void EEPromStorage::saveToEEPROM() {
-    DEBUG("saveToEEPROM");
-    EEPROM.put(0, actualData);
-    if (EEPROM.commit()) {
+void WifiConfigStorage::saveToEEPROM() {
+    log->trace("saveToEEPROM");
+    storage->put(actualData);
+    if (storage->commit()) {
         storageIsDirty = false;
         Serial.printf("EEPROM successfully updated\n");
     } else {
@@ -46,14 +43,14 @@ void EEPromStorage::saveToEEPROM() {
     }
 }
 
-void EEPromStorage::initStorage() {
-    EEPROM.begin(eeprom_size);
-    EEPROM.get(0, actualData);
+void WifiConfigStorage::initStorage() {
+    storage->begin();
+    storage->get(actualData);
     if (memcmp("NB", actualData.configValid, 3) == 0) {
         storageIsValid = true;
-        DEBUG("Storage was valid\n");
+        log->trace("Storage was valid\n");
     } else {
-        DEBUG("storate is invalid, generating default.");
+        log->trace("storate is invalid, generating default.");
         resetStorage();
         saveToEEPROM();
         storageIsValid = true;
@@ -61,23 +58,23 @@ void EEPromStorage::initStorage() {
 }
 
 
-WifiStorage *EEPromStorage::retrieveNetwork(const char *const ssid) {
-    DEBUG1("Retrieving info for ssid: %s\n", ssid);
+WifiStorage *WifiConfigStorage::retrieveNetwork(const char *const ssid) {
+    log->trace("Retrieving info for ssid: %s\n", ssid);
     if (!storageIsValid) {
-        DEBUG("Storage was invalid, initalizing\n");
+        log->trace("Storage was invalid, initalizing\n");
         initStorage();
     }
     for (int i = 0; i < actualData.numberOfNets; i++) {
-        DEBUG1("checking against %s\n", actualData.knownNets[i].AccessPointName);
+        log->trace("checking against %s\n", actualData.knownNets[i].AccessPointName);
         if (memcmp(actualData.knownNets[i].AccessPointName, ssid, MAX_NUMBER_OF_NETS) == 0) {
-            DEBUG("Network was found\n");
+            log->trace("Network was found\n");
             return &actualData.knownNets[i];
         }
     }
     return nullptr;
 }
 
-EEPromStorage::EEPromStorage() : storageIsValid(false), storageIsDirty(false), actualData{} {
+WifiConfigStorage::WifiConfigStorage(Logging * logger, AbstractWifiStorage * abstractStorage) : storageIsValid(false), storageIsDirty(false), actualData{}, log(logger), storage(abstractStorage){
     memcpy(actualData.configValid, "NV", 3);
     WifiStorage nullstorage{};
     memset(nullstorage.AccessPointName, '\0', ACCESSPOINT_NAME_LENGTH);
@@ -85,27 +82,28 @@ EEPromStorage::EEPromStorage() : storageIsValid(false), storageIsDirty(false), a
     for (int i : {0, 1, 2, 3, 4}) {
         actualData.knownNets[i] = nullstorage;
     }
+    actualData.numberOfNets=0;
 }
 
-EEPromStorage::~EEPromStorage() {
-    EEPROM.end();
+WifiConfigStorage::~WifiConfigStorage() {
+    storage->end();
 }
 
-char *EEPromStorage::getApSSID(int i) {
+char *WifiConfigStorage::getApSSID(int i) {
     if (storageIsValid && i < actualData.numberOfNets) {
         return actualData.knownNets[i].AccessPointName;
     }
     return nullptr;
 }
 
-WifiStorage EEPromStorage::getSoftAPData() {
+WifiStorage WifiConfigStorage::getSoftAPData() {
     if (!storageIsValid) {
         initStorage();
     }
     return actualData.fallback;
 }
 
-void EEPromStorage::removeWifiNetwork(const char *const ssid) {
+void WifiConfigStorage::removeWifiNetwork(const char *const ssid) {
     for (int i = 0; i < actualData.numberOfNets; i++) {
         if (strncmp(actualData.knownNets[i].AccessPointName, ssid, MAX_NUMBER_OF_NETS) == 0) {
             // Move all following members down
@@ -120,7 +118,7 @@ void EEPromStorage::removeWifiNetwork(const char *const ssid) {
     }
 }
 
-void EEPromStorage::resetStorage() {
+void WifiConfigStorage::resetStorage() {
     actualData.numberOfNets = 0;
     strncpy(actualData.configValid, "NB", 3);
     actualData.numberOfNets = 0;

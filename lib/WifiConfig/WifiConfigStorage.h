@@ -5,25 +5,16 @@
 #ifndef EEPROM_STORAGE_H
 #define EEPROM_STORAGE_H
 
-#define WIFI_PASSWORD_LENGTH 25
-#define ACCESSPOINT_NAME_LENGTH 20
 
 #include <string>
+#include <ArduinoLog.h>
+#include "AbstractWifiStorage.h"
 
-#define MAX_NUMBER_OF_NETS 5
-typedef struct _WifiStorage {
-    char AccessPointName[ACCESSPOINT_NAME_LENGTH];
-    char AccessPointPassword[WIFI_PASSWORD_LENGTH];
-} WifiStorage;
-
-
-static const int eeprom_size = 512;
-
-class EEPromStorage {
+class WifiConfigStorage {
 public:
-    EEPromStorage();
+    WifiConfigStorage(Logging * logger, AbstractWifiStorage * storage);
 
-    ~EEPromStorage();
+    ~WifiConfigStorage();
 
     int getNumberOfKnownNetworks();
 
@@ -42,16 +33,11 @@ public:
     void resetStorage();
 
 private:
-    struct StorageData {
-        WifiStorage fallback;
-        int numberOfNets;
-        WifiStorage knownNets[MAX_NUMBER_OF_NETS];
-        char configValid[3];
-    };
     bool storageIsValid;
     bool storageIsDirty;
     struct StorageData actualData;
-
+    Logging *log;
+    AbstractWifiStorage * storage;
 
     void saveToEEPROM();
 };

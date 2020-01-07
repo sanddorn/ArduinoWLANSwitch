@@ -30,10 +30,10 @@ private:
 namespace TestHtmlHandler {
     HTMLHandler *subjectUnderTest;
     Logging logging;
-    Mock <Persistence> persistenceMock;
+    Mock <FilePersistence> persistenceMock;
 
     void setUp() {
-        Persistence &persistence = persistenceMock.get();
+        FilePersistence &persistence = persistenceMock.get();
         When(Method(persistenceMock, begin)).Return(true);
         subjectUnderTest = new HTMLHandler(&persistence, &logging);
     }

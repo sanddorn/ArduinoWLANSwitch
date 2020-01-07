@@ -21,9 +21,9 @@ public:
 
 };
 
-class Persistence {
+class FilePersistence {
 public:
-    virtual ~Persistence() = default;
+    virtual ~FilePersistence() = default;
 
     virtual bool begin()  = 0;
 

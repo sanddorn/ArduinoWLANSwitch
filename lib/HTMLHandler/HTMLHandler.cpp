@@ -46,10 +46,10 @@ static string GetEncryptionType(unsigned char thisType) {
 }
 
 
-HTMLHandler::HTMLHandler(Persistence *persistence, Logging *log) : options("<option value=''>No WiFiNetwork</option>"),
-                                                                   noNetwork(0),
-                                                                   persistence(persistence),
-                                                                   _log(log) {
+HTMLHandler::HTMLHandler(FilePersistence *persistence, Logging *log) : options("<option value=''>No WiFiNetwork</option>"),
+                                                                       noNetwork(0),
+                                                                       persistence(persistence),
+                                                                       _log(log) {
     spiffsStarted = persistence->begin();
     _log->trace("SPIFFS started: '%i'", spiffsStarted);
 }

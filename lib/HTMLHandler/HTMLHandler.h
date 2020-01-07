@@ -16,7 +16,7 @@ using namespace std;
 
 class HTMLHandler {
 public:
-    HTMLHandler(Persistence *persit, Logging *log);
+    HTMLHandler(FilePersistence *persit, Logging *log);
 
     ~HTMLHandler();
 
@@ -53,7 +53,7 @@ private:
 
     string getStaticPage(const char *path) const;
 
-    Persistence *persistence;
+    FilePersistence *persistence;
     Logging *_log;
 };
 

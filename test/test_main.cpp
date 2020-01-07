@@ -8,6 +8,7 @@
 
 #include "HTMLHandler/test_HTMLHandler.h"
 #include "HTMLHandler/test_replaceString.h"
+#include "WifiConfig/test_WifiConfig.h"
 
 #ifdef UNIT_TEST
 
@@ -29,6 +30,7 @@ int main(int argc, char **argv)
 
     RUN_TEST_GROUP(TestHtmlHandler);
     RUN_TEST_GROUP(TestReplaceString);
+    RUN_TEST_GROUP(TestWifiConfig);
 
     UNITY_END();
 

@@ -3,7 +3,7 @@
 #include <ESP8266mDNS.h>
 #include <DNSServer.h>
 #include <ArduinoLog.h>
-#include "../lib/EEPROM/EEPromStorage.h"
+#include "WifiConfigStorage.h"
 #include "../lib/HTMLHandler/FS_Persistence.h"
 #include "../lib/HTMLHandler/HTMLHandler.h"
 #include <ArduinoOTA.h>
@@ -30,7 +30,7 @@ HTMLHandler *htmlHandler;
 
 ValveHandler valveHandler(VALVE_PORT);
 
-EEPromStorage storage;
+WifiConfigStorage storage;
 
 // Web server
 ESP8266WebServer server(80);

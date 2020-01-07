@@ -30,7 +30,7 @@ private:
 
 };
 
-class FS_Persistence : public Persistence {
+class FS_Persistence : public FilePersistence {
 public:
     explicit FS_Persistence(fs::FS *filesystem) : fs(filesystem) {};
 
