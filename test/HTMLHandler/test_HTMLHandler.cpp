@@ -111,7 +111,7 @@ namespace TestHtmlHandler {
         std::shared_ptr <MockStorage> partialFile(new MockStorage(partial));
         std::shared_ptr <MockStorage> wifiFile(new MockStorage(wifiString));
         When(Method(persistenceMock, open).Using("/AvailableNetwork.partial", "r")).Return(partialFile);
-        When(Method(persistenceMock, open).Using("/WifiPage.html","r")).Return(wifiFile);
+        When(Method(persistenceMock, open).Using("/WifiPage.html", "r")).Return(wifiFile);
         string mainpage;
         try {
             subjectUnderTest->addAvailableNetwork("ssid", 4, 42);
@@ -130,7 +130,7 @@ namespace TestHtmlHandler {
         std::shared_ptr <MockStorage> partialFile(new MockStorage(partial));
         std::shared_ptr <MockStorage> wifiFile(new MockStorage(wifiString));
         When(Method(persistenceMock, open).Using("/AvailableNetwork.partial", "r")).AlwaysReturn(partialFile);
-        When(Method(persistenceMock, open).Using("/WifiPage.html","r")).Return(wifiFile);
+        When(Method(persistenceMock, open).Using("/WifiPage.html", "r")).Return(wifiFile);
         string mainpage;
         try {
             subjectUnderTest->addAvailableNetwork("ssid", 4, 42);
@@ -140,7 +140,9 @@ namespace TestHtmlHandler {
         } catch (UnexpectedMethodCallException e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
-        TEST_ASSERT_TRUE(mainpage.compare("Number: '1' SSID: 'ssid' encryption: 'WPA2' strength: '42'Number: '2' SSID: 'ssid2' encryption: 'WPA2' strength: '43'") == 0);
+        TEST_ASSERT_TRUE(mainpage.compare(
+                "Number: '1' SSID: 'ssid' encryption: 'WPA2' strength: '42'Number: '2' SSID: 'ssid2' encryption: 'WPA2' strength: '43'") ==
+                         0);
     }
 
     void test_addAvailableNetworkOptions() {
@@ -150,7 +152,7 @@ namespace TestHtmlHandler {
         std::shared_ptr <MockStorage> partialFile(new MockStorage(partial));
         std::shared_ptr <MockStorage> wifiFile(new MockStorage(wifiString));
         When(Method(persistenceMock, open).Using("/AvailableNetwork.partial", "r")).AlwaysReturn(partialFile);
-        When(Method(persistenceMock, open).Using("/WifiPage.html","r")).Return(wifiFile);
+        When(Method(persistenceMock, open).Using("/WifiPage.html", "r")).Return(wifiFile);
         string mainpage;
         try {
             subjectUnderTest->addAvailableNetwork("ssid", 4, 42);
@@ -160,7 +162,9 @@ namespace TestHtmlHandler {
         } catch (UnexpectedMethodCallException e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
-        TEST_ASSERT_TRUE(mainpage.compare("<option value=''>No WiFiNetwork</option><option value='ssid'>ssid</option><option value='ssid2'>ssid2</option>") == 0);
+        TEST_ASSERT_TRUE(mainpage.compare(
+                "<option value=''>No WiFiNetwork</option><option value='ssid'>ssid</option><option value='ssid2'>ssid2</option>") ==
+                         0);
     }
 
     void test_addConfiguredNetworks() {
@@ -170,7 +174,7 @@ namespace TestHtmlHandler {
         std::shared_ptr <MockStorage> partialFile(new MockStorage(partial));
         std::shared_ptr <MockStorage> wifiFile(new MockStorage(wifiString));
         When(Method(persistenceMock, open).Using("/RegisteredNetwork.partial", "r")).AlwaysReturn(partialFile);
-        When(Method(persistenceMock, open).Using("/WifiPage.html","r")).Return(wifiFile);
+        When(Method(persistenceMock, open).Using("/WifiPage.html", "r")).Return(wifiFile);
         string mainpage;
         try {
             subjectUnderTest->addRegisteredNetwork("ssid");
@@ -187,7 +191,7 @@ namespace TestHtmlHandler {
         persistenceMock.ClearInvocationHistory();
         string wifiString = "SSID: '<softapssid/>' Password: '<softappassword>";
         std::shared_ptr <MockStorage> wifiFile(new MockStorage(wifiString));
-        When(Method(persistenceMock, open).Using("/WifiPage.html","r")).Return(wifiFile);
+        When(Method(persistenceMock, open).Using("/WifiPage.html", "r")).Return(wifiFile);
         string mainpage;
         try {
             subjectUnderTest->setSoftAPCredentials("ssid", "password");

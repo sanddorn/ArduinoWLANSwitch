@@ -31,8 +31,8 @@ void FS_Persistence::end() {
     fs->end();
 }
 
-std::shared_ptr<StorageBlob> FS_Persistence::open(const char *path, const char *mode) {
-    File file = fs->open(path, mode);
+std::shared_ptr<StorageBlob> FS_Persistence::open(const std::string path, const std::string mode) {
+    File file = fs->open(path.c_str(), mode.c_str());
     std::shared_ptr<FileStorage> blob (new FileStorage(file));
     return blob;
 }

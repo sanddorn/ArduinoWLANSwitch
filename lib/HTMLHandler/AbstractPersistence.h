@@ -29,6 +29,6 @@ public:
 
     virtual void end() = 0;
 
-    virtual std::shared_ptr<StorageBlob>  open(const char *path, const char *mode) = 0 ;
+    virtual std::shared_ptr<StorageBlob>  open(const std::string path, const std::string mode) = 0 ;
 };
 #endif //ARDUINOWLANSWITCH_ABSTRACTPERSISTENCE_H

@@ -40,7 +40,7 @@ public:
 
     void end() override;
 
-    std::shared_ptr<StorageBlob> open(const char *path, const char *mode) override;
+    std::shared_ptr<StorageBlob> open(const std::string path, const std::string mode) override;
 
 private:
     fs::FS *fs;
