@@ -74,8 +74,22 @@ namespace TestWifiConfig {
         VerifyNoOtherInvocations(storage);
     }
 
+    void test_resetStorage() {
+        storage.ClearInvocationHistory();
+        try {
+            subjectUnderTest->resetStorage();
+            TEST_ASSERT_EQUAL_STRING( "ESP8266_Config_WLAN", subjectUnderTest->getSoftAPData().AccessPointName);
+            TEST_ASSERT_EQUAL_STRING( "12345678", subjectUnderTest->getSoftAPData().AccessPointPassword);
+            TEST_ASSERT_EQUAL(0, subjectUnderTest->getNumberOfKnownNetworks());
+        } catch (UnexpectedMethodCallException e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+
+    }
+
     void run_tests() {
         RUN_TEST(test_initStorage);
         RUN_TEST(test_initStorageInvalidStorage);
+        RUN_TEST(test_resetStorage);
     }
 }
