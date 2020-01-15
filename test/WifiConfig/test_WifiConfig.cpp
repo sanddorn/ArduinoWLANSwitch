@@ -6,7 +6,6 @@
 #include <unity.h>
 
 #include "test_WifiConfig.h"
-#include "../../lib/WifiConfig/AbstractWifiStorage.h"
 #include <WifiConfigStorage.h>
 #include <cstring>
 
@@ -14,7 +13,7 @@ using namespace fakeit;
 namespace TestWifiConfig {
 
     static struct StorageData createWifiStorageMinimal() {
-        struct StorageData wifiStorage;
+        struct StorageData wifiStorage{};
         memcpy(wifiStorage.configValid, "NB", 3);
         WifiStorage nullstorage{};
         memset(nullstorage.AccessPointName, '\0', ACCESSPOINT_NAME_LENGTH);
@@ -22,6 +21,24 @@ namespace TestWifiConfig {
         for (int i : {0, 1, 2, 3, 4}) {
             wifiStorage.knownNets[i] = nullstorage;
         }
+        return wifiStorage;
+    }
+
+    static struct StorageData createSingleFilledStorageData() {
+        struct StorageData wifiStorage = createWifiStorageMinimal();
+        memcpy(wifiStorage.knownNets[0].AccessPointName, "SSID", 4);
+        memcpy(wifiStorage.knownNets[0].AccessPointPassword, "PASSWORD", 8);
+        wifiStorage.numberOfNets=1;
+
+        return wifiStorage;
+    }
+
+    static struct StorageData createDoubleFilledStorageData() {
+        struct StorageData wifiStorage = createSingleFilledStorageData();
+        memcpy(wifiStorage.knownNets[1].AccessPointName, "SSID1", 4);
+        memcpy(wifiStorage.knownNets[1].AccessPointPassword, "PASSWORD", 8);
+        wifiStorage.numberOfNets=1;
+
         return wifiStorage;
     }
 
@@ -44,7 +61,7 @@ namespace TestWifiConfig {
         });
         try {
             subjectUnderTest->initStorage();
-        } catch (UnexpectedMethodCallException e) {
+        } catch (UnexpectedMethodCallException &e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
         Verify(Method(storage, begin)).Once();
@@ -64,7 +81,7 @@ namespace TestWifiConfig {
         When(Method(storage, commit)).Return();
         try {
             subjectUnderTest->initStorage();
-        } catch (UnexpectedMethodCallException e) {
+        } catch (UnexpectedMethodCallException &e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
         Verify(Method(storage, begin)).Once();
@@ -74,8 +91,47 @@ namespace TestWifiConfig {
         VerifyNoOtherInvocations(storage);
     }
 
+
+    void test_getSoftAPData() {
+        storage.ClearInvocationHistory();
+        struct StorageData wifiStorage = createWifiStorageMinimal();
+        When(Method(storage, begin)).Return();
+        When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
+            result = wifiStorage;
+        });
+        WifiStorage resultStorage;
+        try {
+            subjectUnderTest->initStorage();
+            resultStorage = subjectUnderTest->getSoftAPData();
+        } catch (UnexpectedMethodCallException &e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_EQUAL_STRING(wifiStorage.fallback.AccessPointPassword, resultStorage.AccessPointPassword);
+        TEST_ASSERT_EQUAL_STRING(wifiStorage.fallback.AccessPointName, resultStorage.AccessPointName);
+    }
+
+    void test_getApSSID() {
+        storage.ClearInvocationHistory();
+        struct StorageData wifiStorage = createSingleFilledStorageData();
+        When(Method(storage, begin)).Return();
+        When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
+            result = wifiStorage;
+        });
+        char * ssid = nullptr;
+        try {
+            subjectUnderTest->initStorage();
+            ssid = subjectUnderTest->getApSSID(0);
+        } catch (UnexpectedMethodCallException &e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_EQUAL_STRING(wifiStorage.knownNets[0].AccessPointName, ssid);
+    }
+
+
     void run_tests() {
         RUN_TEST(test_initStorage);
         RUN_TEST(test_initStorageInvalidStorage);
+        RUN_TEST(test_getSoftAPData);
+        RUN_TEST(test_getApSSID);
     }
 }

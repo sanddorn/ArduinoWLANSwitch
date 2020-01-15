@@ -55,7 +55,7 @@ namespace TestHtmlHandler {
             Verify(Method(fileMock, isFile)).Exactly(2);
             Verify(Method(fileMock, size)).Once();
             Verify(Method(fileMock, readString)).Once();
-        } catch (UnexpectedMethodCallException e) {
+        } catch (UnexpectedMethodCallException &e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
     }
@@ -76,7 +76,7 @@ namespace TestHtmlHandler {
             Verify(Method(fileMock, isFile)).Exactly(2);
             Verify(Method(fileMock, size)).Once();
             Verify(Method(fileMock, readString)).Once();
-        } catch (UnexpectedMethodCallException e) {
+        } catch (UnexpectedMethodCallException &e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
         TEST_ASSERT_TRUE(original.compare(mainpage) == 0);
@@ -98,7 +98,7 @@ namespace TestHtmlHandler {
             Verify(Method(fileMock, isFile)).Exactly(2);
             Verify(Method(fileMock, size)).Once();
             Verify(Method(fileMock, readString)).Once();
-        } catch (UnexpectedMethodCallException e) {
+        } catch (UnexpectedMethodCallException &e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
         TEST_ASSERT_TRUE(original.compare(mainpage) == 0);
@@ -117,7 +117,7 @@ namespace TestHtmlHandler {
             subjectUnderTest->addAvailableNetwork("ssid", 4, 42);
             mainpage = subjectUnderTest->getWifiPage();
             subjectUnderTest->resetWifiPage();
-        } catch (UnexpectedMethodCallException e) {
+        } catch (UnexpectedMethodCallException &e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
         TEST_ASSERT_TRUE(mainpage.compare("Number: '1' SSID: 'ssid' encryption: 'WPA2' strength: '42'") == 0);
@@ -137,7 +137,7 @@ namespace TestHtmlHandler {
             subjectUnderTest->addAvailableNetwork("ssid2", 4, 43);
             mainpage = subjectUnderTest->getWifiPage();
             subjectUnderTest->resetWifiPage();
-        } catch (UnexpectedMethodCallException e) {
+        } catch (UnexpectedMethodCallException &e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
         TEST_ASSERT_TRUE(mainpage.compare(
@@ -159,7 +159,7 @@ namespace TestHtmlHandler {
             subjectUnderTest->addAvailableNetwork("ssid2", 4, 43);
             mainpage = subjectUnderTest->getWifiPage();
             subjectUnderTest->resetWifiPage();
-        } catch (UnexpectedMethodCallException e) {
+        } catch (UnexpectedMethodCallException &e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
         TEST_ASSERT_TRUE(mainpage.compare(
@@ -180,7 +180,7 @@ namespace TestHtmlHandler {
             subjectUnderTest->addRegisteredNetwork("ssid");
             mainpage = subjectUnderTest->getWifiPage();
             subjectUnderTest->resetWifiPage();
-        } catch (UnexpectedMethodCallException e) {
+        } catch (UnexpectedMethodCallException &e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
         TEST_ASSERT_TRUE(mainpage.compare("SSID: 'ssid' ") == 0);
@@ -197,7 +197,7 @@ namespace TestHtmlHandler {
             subjectUnderTest->setSoftAPCredentials("ssid", "password");
             mainpage = subjectUnderTest->getWifiPage();
             subjectUnderTest->resetWifiPage();
-        } catch (UnexpectedMethodCallException e) {
+        } catch (UnexpectedMethodCallException &e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
         TEST_ASSERT_TRUE(mainpage.compare("SSID: 'ssid' Password: 'password") == 0);
@@ -212,7 +212,7 @@ namespace TestHtmlHandler {
         try {
             mainpage = subjectUnderTest->getSwitch(true);
             subjectUnderTest->resetWifiPage();
-        } catch (UnexpectedMethodCallException e) {
+        } catch (UnexpectedMethodCallException &e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
         TEST_ASSERT_TRUE(mainpage.compare("&#x274E; The valve is open") == 0);
@@ -227,7 +227,7 @@ namespace TestHtmlHandler {
         try {
             mainpage = subjectUnderTest->getSwitch(false);
             subjectUnderTest->resetWifiPage();
-        } catch (UnexpectedMethodCallException e) {
+        } catch (UnexpectedMethodCallException &e) {
             TEST_FAIL_MESSAGE(e.what().c_str());
         }
         TEST_ASSERT_TRUE(mainpage.compare("&#x274C; The valve is closed") == 0);
