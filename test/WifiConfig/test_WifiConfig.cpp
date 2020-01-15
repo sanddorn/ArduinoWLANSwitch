@@ -28,7 +28,7 @@ namespace TestWifiConfig {
         struct StorageData wifiStorage = createWifiStorageMinimal();
         memcpy(wifiStorage.knownNets[0].AccessPointName, "SSID", 4);
         memcpy(wifiStorage.knownNets[0].AccessPointPassword, "PASSWORD", 8);
-        wifiStorage.numberOfNets=1;
+        wifiStorage.numberOfNets = 1;
 
         return wifiStorage;
     }
@@ -37,14 +37,21 @@ namespace TestWifiConfig {
         struct StorageData wifiStorage = createSingleFilledStorageData();
         memcpy(wifiStorage.knownNets[1].AccessPointName, "SSID1", 4);
         memcpy(wifiStorage.knownNets[1].AccessPointPassword, "PASSWORD", 8);
-        wifiStorage.numberOfNets=1;
+        wifiStorage.numberOfNets = 2;
 
+        return wifiStorage;
+    }
+
+    static WifiStorage createWifiStorage() {
+        WifiStorage wifiStorage{};
+        memcpy(wifiStorage.AccessPointName, "WIFI_SSID", 4);
+        memcpy(wifiStorage.AccessPointPassword, "PASSWORD", 8);
         return wifiStorage;
     }
 
     WifiConfigStorage *subjectUnderTest;
     Logging logging;
-    Mock <AbstractWifiStorage> storage;
+    Mock<AbstractWifiStorage> storage;
 
     void setUp() {
         AbstractWifiStorage &persistence = storage.get();
@@ -72,7 +79,7 @@ namespace TestWifiConfig {
     void test_initStorageInvalidStorage() {
         storage.ClearInvocationHistory();
         struct StorageData wifiStorage = createWifiStorageMinimal();
-        memcpy(wifiStorage.configValid, "NV",3);
+        memcpy(wifiStorage.configValid, "NV", 3);
         When(Method(storage, begin)).Return();
         When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
             result = wifiStorage;
@@ -117,7 +124,7 @@ namespace TestWifiConfig {
         When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
             result = wifiStorage;
         });
-        char * ssid = nullptr;
+        char *ssid = nullptr;
         try {
             subjectUnderTest->initStorage();
             ssid = subjectUnderTest->getApSSID(0);
@@ -128,10 +135,74 @@ namespace TestWifiConfig {
     }
 
 
+    void test_getNumberOfKnownNetworks() {
+        storage.ClearInvocationHistory();
+        struct StorageData wifiStorage = createDoubleFilledStorageData();
+        When(Method(storage, begin)).Return();
+        When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
+            result = wifiStorage;
+        });
+        int noNetworks = 0;
+        try {
+            subjectUnderTest->initStorage();
+            noNetworks = subjectUnderTest->getNumberOfKnownNetworks();
+        } catch (UnexpectedMethodCallException &e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_EQUAL_INT(2, noNetworks);
+    }
+
+    void test_addWifiNetwork() {
+        storage.ClearInvocationHistory();
+        struct StorageData wifiStorage = createDoubleFilledStorageData();
+        When(Method(storage, begin)).Return();
+        When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
+            result = wifiStorage;
+        });
+        Fake(Method(storage, put));
+        When(Method(storage, commit)).Return(true);
+        int noNetworks = 0;
+        try {
+            subjectUnderTest->initStorage();
+            subjectUnderTest->addWifiNetwork(createWifiStorage());
+            noNetworks = subjectUnderTest->getNumberOfKnownNetworks();
+            Verify(Method(storage, put), Method(storage, commit)).Once();
+
+        } catch (UnexpectedMethodCallException &e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_EQUAL_INT(3, noNetworks);
+    }
+
+    void test_addWifiNetwork_CommitToEEPROMFails() {
+        storage.ClearInvocationHistory();
+        struct StorageData wifiStorage = createDoubleFilledStorageData();
+        When(Method(storage, begin)).Return();
+        When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
+            result = wifiStorage;
+        });
+        Fake(Method(storage, put));
+        When(Method(storage, commit)).Return(false);
+        int noNetworks = 0;
+        try {
+            subjectUnderTest->initStorage();
+            subjectUnderTest->addWifiNetwork(createWifiStorage());
+            noNetworks = subjectUnderTest->getNumberOfKnownNetworks();
+            Verify(Method(storage, put), Method(storage, commit)).Once();
+
+        } catch (UnexpectedMethodCallException &e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_EQUAL_INT(-1, noNetworks);
+    }
+
     void run_tests() {
         RUN_TEST(test_initStorage);
         RUN_TEST(test_initStorageInvalidStorage);
         RUN_TEST(test_getSoftAPData);
         RUN_TEST(test_getApSSID);
+        RUN_TEST(test_getNumberOfKnownNetworks);
+        RUN_TEST(test_addWifiNetwork);
+        RUN_TEST(test_addWifiNetwork_CommitToEEPROMFails);
     }
 }
