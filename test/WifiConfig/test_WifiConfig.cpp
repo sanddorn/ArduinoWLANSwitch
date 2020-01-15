@@ -24,18 +24,22 @@ namespace TestWifiConfig {
         return wifiStorage;
     }
 
+    static const char *const SSID_FIRST_KNOWNNETWORK = "SSID";
+
     static struct StorageData createSingleFilledStorageData() {
         struct StorageData wifiStorage = createWifiStorageMinimal();
-        memcpy(wifiStorage.knownNets[0].AccessPointName, "SSID", 4);
+        memcpy(wifiStorage.knownNets[0].AccessPointName, SSID_FIRST_KNOWNNETWORK, 4);
         memcpy(wifiStorage.knownNets[0].AccessPointPassword, "PASSWORD", 8);
         wifiStorage.numberOfNets = 1;
 
         return wifiStorage;
     }
 
+    static const char *const SSID_SECOND_KNOWNNETWORK = "SSID1";
+
     static struct StorageData createDoubleFilledStorageData() {
         struct StorageData wifiStorage = createSingleFilledStorageData();
-        memcpy(wifiStorage.knownNets[1].AccessPointName, "SSID1", 4);
+        memcpy(wifiStorage.knownNets[1].AccessPointName, SSID_SECOND_KNOWNNETWORK, 4);
         memcpy(wifiStorage.knownNets[1].AccessPointPassword, "PASSWORD", 8);
         wifiStorage.numberOfNets = 2;
 
@@ -196,6 +200,69 @@ namespace TestWifiConfig {
         TEST_ASSERT_EQUAL_INT(-1, noNetworks);
     }
 
+    void test_removeWifiNetwork() {
+        storage.ClearInvocationHistory();
+        struct StorageData wifiStorage = createDoubleFilledStorageData();
+        When(Method(storage, begin)).Return();
+        When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
+            result = wifiStorage;
+        });
+        Fake(Method(storage, put));
+        When(Method(storage, commit)).Return(true);
+        int noNetworks = 0;
+        try {
+            subjectUnderTest->initStorage();
+            subjectUnderTest->removeWifiNetwork(SSID_FIRST_KNOWNNETWORK);
+            noNetworks = subjectUnderTest->getNumberOfKnownNetworks();
+            Verify(Method(storage, put), Method(storage, commit)).Once();
+
+        } catch (UnexpectedMethodCallException &e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_EQUAL_INT(1, noNetworks);
+    }
+
+    void test_removeWifiNetwork_CommitToEEPROMFails() {
+        storage.ClearInvocationHistory();
+        struct StorageData wifiStorage = createDoubleFilledStorageData();
+        When(Method(storage, begin)).Return();
+        When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
+            result = wifiStorage;
+        });
+        Fake(Method(storage, put));
+        When(Method(storage, commit)).Return(false);
+        int noNetworks = 0;
+        try {
+            subjectUnderTest->initStorage();
+            subjectUnderTest->removeWifiNetwork(SSID_FIRST_KNOWNNETWORK);
+            noNetworks = subjectUnderTest->getNumberOfKnownNetworks();
+            Verify(Method(storage, put), Method(storage, commit)).Once();
+
+        } catch (UnexpectedMethodCallException &e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_EQUAL_INT(-1, noNetworks);
+    }
+
+    void test_removeWifiNetwork_UnkownNetwork() {
+        storage.ClearInvocationHistory();
+        struct StorageData wifiStorage = createDoubleFilledStorageData();
+        When(Method(storage, begin)).Return();
+        When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
+            result = wifiStorage;
+        });
+        int noNetworks = 0;
+        try {
+            subjectUnderTest->initStorage();
+            subjectUnderTest->removeWifiNetwork("IRGENDWASFALSCHES");
+            noNetworks = subjectUnderTest->getNumberOfKnownNetworks();
+
+        } catch (UnexpectedMethodCallException &e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_EQUAL_INT(2, noNetworks);
+    }
+
     void run_tests() {
         RUN_TEST(test_initStorage);
         RUN_TEST(test_initStorageInvalidStorage);
@@ -204,5 +271,8 @@ namespace TestWifiConfig {
         RUN_TEST(test_getNumberOfKnownNetworks);
         RUN_TEST(test_addWifiNetwork);
         RUN_TEST(test_addWifiNetwork_CommitToEEPROMFails);
+        RUN_TEST(test_removeWifiNetwork);
+        RUN_TEST(test_removeWifiNetwork_CommitToEEPROMFails);
+        RUN_TEST(test_removeWifiNetwork_UnkownNetwork);
     }
 }

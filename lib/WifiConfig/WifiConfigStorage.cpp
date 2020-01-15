@@ -104,14 +104,16 @@ WifiStorage WifiConfigStorage::getSoftAPData() {
 
 void WifiConfigStorage::removeWifiNetwork(const char *const ssid) {
     for (int i = 0; i < actualData.numberOfNets; i++) {
-        if (strncmp(actualData.knownNets[i].AccessPointName, ssid, MAX_NUMBER_OF_NETS) == 0) {
+        if (strncmp(actualData.knownNets[i].AccessPointName, ssid, ACCESSPOINT_NAME_LENGTH) == 0) {
             // Move all following members down
             log->trace("Removing entry for ssid: %s", actualData.knownNets[i].AccessPointName);
             int j = i + 1;
             while (j < actualData.numberOfNets) {
                 actualData.knownNets[j - 1] = actualData.knownNets[j];
+                j++;
             }
             actualData.numberOfNets--;
+            saveToEEPROM();
             return;
         }
     }
