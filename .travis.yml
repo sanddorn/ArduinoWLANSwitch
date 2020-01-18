@@ -14,13 +14,13 @@ script:
 - platformio test -e coverage -v
 - mkdir -p docs/coverage
 - gcovr --html-details --exclude .pio --exclude test --output docs/coverage/coverage.html
-# todo: Add github pages and upload.
 deploy:
   provider: pages
   skip_cleanup: true
   github_token: $GITHUB_TOKEN  # Set in the settings page of your repository, as a secure variable
   keep_history: true
-  target_branch: pages
+  allow_empty_commit: true
+#  target_branch: pages
   on:
     branch: master
 notifications:
