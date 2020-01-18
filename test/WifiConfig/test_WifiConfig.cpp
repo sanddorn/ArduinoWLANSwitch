@@ -25,22 +25,26 @@ namespace TestWifiConfig {
     }
 
     static const char *const SSID_FIRST_KNOWNNETWORK = "SSID";
+    static const char *const SSID_SECOND_KNOWNNETWORK = "SSID1";
+
+    static const char *const PASSWORD_FIRST_NETWORK = "PASSWORD_AP1";
+    static const char *const PASSWORD_SECOND_NETWORK = "PASSWORD_AP2";
+
 
     static struct StorageData createSingleFilledStorageData() {
         struct StorageData wifiStorage = createWifiStorageMinimal();
-        memcpy(wifiStorage.knownNets[0].AccessPointName, SSID_FIRST_KNOWNNETWORK, 4);
-        memcpy(wifiStorage.knownNets[0].AccessPointPassword, "PASSWORD", 8);
+        memcpy(wifiStorage.knownNets[0].AccessPointName, SSID_FIRST_KNOWNNETWORK, strlen(SSID_FIRST_KNOWNNETWORK));
+        memcpy(wifiStorage.knownNets[0].AccessPointPassword, PASSWORD_FIRST_NETWORK, strlen(PASSWORD_FIRST_NETWORK));
         wifiStorage.numberOfNets = 1;
 
         return wifiStorage;
     }
 
-    static const char *const SSID_SECOND_KNOWNNETWORK = "SSID1";
 
     static struct StorageData createDoubleFilledStorageData() {
         struct StorageData wifiStorage = createSingleFilledStorageData();
-        memcpy(wifiStorage.knownNets[1].AccessPointName, SSID_SECOND_KNOWNNETWORK, 4);
-        memcpy(wifiStorage.knownNets[1].AccessPointPassword, "PASSWORD", 8);
+        memcpy(wifiStorage.knownNets[1].AccessPointName, SSID_SECOND_KNOWNNETWORK, strlen(SSID_SECOND_KNOWNNETWORK));
+        memcpy(wifiStorage.knownNets[1].AccessPointPassword, PASSWORD_SECOND_NETWORK, strlen(PASSWORD_FIRST_NETWORK));
         wifiStorage.numberOfNets = 2;
 
         return wifiStorage;
@@ -263,6 +267,67 @@ namespace TestWifiConfig {
         TEST_ASSERT_EQUAL_INT(2, noNetworks);
     }
 
+
+    void test_retrieveNetwork() {
+        storage.ClearInvocationHistory();
+        struct StorageData wifiStorage = createDoubleFilledStorageData();
+        When(Method(storage, begin)).Return();
+        When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
+            result = wifiStorage;
+        });
+        WifiStorage * retrievedWifi = nullptr;
+        try {
+            subjectUnderTest->initStorage();
+            retrievedWifi = subjectUnderTest->retrieveNetwork(SSID_FIRST_KNOWNNETWORK);
+
+        } catch (UnexpectedMethodCallException &e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_NOT_NULL(retrievedWifi);
+        TEST_ASSERT_EQUAL_STRING(SSID_FIRST_KNOWNNETWORK, retrievedWifi->AccessPointName);
+        TEST_ASSERT_EQUAL_STRING(PASSWORD_FIRST_NETWORK, retrievedWifi->AccessPointPassword);
+    }
+
+    void test_retrieveNetwork_secondNetwork() {
+        storage.ClearInvocationHistory();
+        struct StorageData wifiStorage = createDoubleFilledStorageData();
+        When(Method(storage, begin)).Return();
+        When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
+            result = wifiStorage;
+        });
+        WifiStorage * retrievedWifi = nullptr;
+        try {
+            subjectUnderTest->initStorage();
+            retrievedWifi = subjectUnderTest->retrieveNetwork(SSID_SECOND_KNOWNNETWORK);
+
+        } catch (UnexpectedMethodCallException &e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_NOT_NULL(retrievedWifi);
+        TEST_ASSERT_EQUAL_STRING(SSID_SECOND_KNOWNNETWORK, retrievedWifi->AccessPointName);
+        TEST_ASSERT_EQUAL_STRING(PASSWORD_SECOND_NETWORK, retrievedWifi->AccessPointPassword);
+    }
+
+
+    void test_retrieveNetwork_UnkownNetwork() {
+        storage.ClearInvocationHistory();
+        struct StorageData wifiStorage = createDoubleFilledStorageData();
+        When(Method(storage, begin)).Return();
+        When(Method(storage, get)).AlwaysDo([wifiStorage](StorageData &result) {
+            result = wifiStorage;
+        });
+        WifiStorage * retrievedWifi = nullptr;
+        try {
+            subjectUnderTest->initStorage();
+            retrievedWifi = subjectUnderTest->retrieveNetwork("SOMETHING UNKNOWN");
+
+        } catch (UnexpectedMethodCallException &e) {
+            TEST_FAIL_MESSAGE(e.what().c_str());
+        }
+        TEST_ASSERT_NULL(retrievedWifi);
+    }
+
+
     void run_tests() {
         RUN_TEST(test_initStorage);
         RUN_TEST(test_initStorageInvalidStorage);
@@ -274,5 +339,9 @@ namespace TestWifiConfig {
         RUN_TEST(test_removeWifiNetwork);
         RUN_TEST(test_removeWifiNetwork_CommitToEEPROMFails);
         RUN_TEST(test_removeWifiNetwork_UnkownNetwork);
+        RUN_TEST(test_retrieveNetwork);
+        RUN_TEST(test_retrieveNetwork_secondNetwork);
+        RUN_TEST(test_retrieveNetwork_UnkownNetwork);
+
     }
 }

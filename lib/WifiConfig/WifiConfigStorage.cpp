@@ -73,7 +73,10 @@ WifiStorage *WifiConfigStorage::retrieveNetwork(const char *const ssid) {
     return nullptr;
 }
 
-WifiConfigStorage::WifiConfigStorage(Logging * logger, AbstractWifiStorage * abstractStorage) : storageIsValid(false), storageIsDirty(false), actualData{}, log(logger), storage(abstractStorage){
+WifiConfigStorage::WifiConfigStorage(Logging *logger, AbstractWifiStorage *abstractStorage) : storageIsValid(false),
+                                                                                              storageIsDirty(false),
+                                                                                              actualData{}, log(logger),
+                                                                                              storage(abstractStorage) {
     memcpy(actualData.configValid, "NV", 3);
     WifiStorage nullstorage{};
     memset(nullstorage.AccessPointName, '\0', ACCESSPOINT_NAME_LENGTH);
@@ -81,7 +84,7 @@ WifiConfigStorage::WifiConfigStorage(Logging * logger, AbstractWifiStorage * abs
     for (int i : {0, 1, 2, 3, 4}) {
         actualData.knownNets[i] = nullstorage;
     }
-    actualData.numberOfNets=0;
+    actualData.numberOfNets = 0;
 }
 
 WifiConfigStorage::~WifiConfigStorage() {
