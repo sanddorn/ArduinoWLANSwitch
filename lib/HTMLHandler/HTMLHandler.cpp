@@ -3,11 +3,24 @@
 //
 
 #include "HTMLHandler.h"
-#include <ESP8266WiFi.h>
-#include <FS.h>
+#include <Arduino.h>
+
+#ifdef UNIT_TEST
+#include <arduino/noniso.h>
+#endif
 
 
-static string GetEncryptionType(byte thisType) {
+/* TODO: Externalize dependency to ESP8266WiFi (GetEncryptionType) */
+enum wl_enc_type {  /* Values map to 802.11 encryption suites... */
+    ENC_TYPE_WEP = 5,
+    ENC_TYPE_TKIP = 2,
+    ENC_TYPE_CCMP = 4,
+    /* ... except these two, 7 and 8 are reserved in 802.11-2007 */
+            ENC_TYPE_NONE = 7,
+    ENC_TYPE_AUTO = 8
+};
+
+static string GetEncryptionType(unsigned char thisType) {
     string output;
     // read the encryption type and print out the name:
     switch (thisType) {
@@ -32,9 +45,22 @@ static string GetEncryptionType(byte thisType) {
     return output;
 }
 
+
+HTMLHandler::HTMLHandler(FilePersistence *persistence, Logging *log) : options("<option value=''>No WiFiNetwork</option>"),
+                                                                       noNetwork(0),
+                                                                       persistence(persistence),
+                                                                       _log(log) {
+    spiffsStarted = persistence->begin();
+    _log->trace("SPIFFS started: '%i'", spiffsStarted);
+}
+
+HTMLHandler::~HTMLHandler() {
+    persistence->end();
+}
+
 string HTMLHandler::getMainPage() {
     const char *path = "/MainPage.html";
-   return getStaticPage(path);
+    return getStaticPage(path);
 }
 
 string HTMLHandler::getWifiSaveDonePage() {
@@ -46,11 +72,11 @@ string HTMLHandler::getStaticPage(const char *path) const {
     if (!spiffsStarted)
         return internalError;
     string mainpage;
-    File mainpageFile = SPIFFS.open(path, "r");
-    Serial.printf("SPIFFS.open returned File: %i\n", mainpageFile.isFile());
-    if (mainpageFile.isFile() && mainpageFile.size() > 0) {
-        mainpage = mainpageFile.readString().c_str();
-        mainpageFile.close();
+    std::shared_ptr<StorageBlob> mainpageFile = persistence->open(path, "r");
+    _log->trace("persistence.open returned File: %i", mainpageFile->isFile());
+    if (mainpageFile->isFile() && mainpageFile->size() > 0) {
+        mainpage = mainpageFile->readString();
+        mainpageFile->close();
     } else {
         mainpage = internalError;
     }
@@ -58,52 +84,28 @@ string HTMLHandler::getStaticPage(const char *path) const {
 }
 
 string HTMLHandler::getCss() {
-    if (!spiffsStarted)
-        return internalError;
-    string cssString;
-    File cssFile = SPIFFS.open("/portal.css", "r");
-    if (cssFile.isFile() && cssFile.size() > 0) {
-        cssString = cssFile.readString().c_str();
-        cssFile.close();
-        Serial.printf("CSS-File Read\n");
-    } else {
-        cssString = "";
-    }
-    return cssString;
-
+    const char *path = "/portal.css";
+    return getStaticPage(path);
 }
 
 void HTMLHandler::addRegisteredNetwork(const string &ssid) {
-    File partial = SPIFFS.open("/RegisteredNetwork.partial", "r");
-    string newRegisteredNetword;
-    if (partial.isFile() && partial.size() > 0) {
-        newRegisteredNetword = partial.readString().c_str();
-        partial.close();
-        Serial.printf("Partial-File Read\n");
-    } else {
-        newRegisteredNetword = internalError;
-    }
+    const char *path = "/RegisteredNetwork.partial";
+    string newRegisteredNetword = getStaticPage(path);
     replaceString(newRegisteredNetword, "<ssid/>", ssid);
     registeredNetwork += newRegisteredNetword;
 
 }
 
-void HTMLHandler::addAvailableNetwork(const string &ssid, const uint8 encryption, int strength) {
+void HTMLHandler::addAvailableNetwork(const string &ssid, const unsigned char encryption, int strength) {
     if (ssid.length() < 2) {
         return;
     }
-    File partial = SPIFFS.open("/AvailableNetwork.partial", "r");
-    string newAvalilableNetwork;
-    if (partial.isFile() && partial.size() > 0) {
-        newAvalilableNetwork = partial.readString().c_str();
-        partial.close();
-        Serial.printf("Partial-File Read\n");
-    } else {
-        newAvalilableNetwork = internalError;
-    }
-    Serial.printf("adding Network '%s'\n", ssid.c_str());
+
+    const char *path = "/AvailableNetwork.partial";
+    string newAvalilableNetwork = getStaticPage(path);
+    _log->trace("adding Network '%s'", ssid.c_str());
     char tmp[10];
-    replaceString(newAvalilableNetwork, "<number/>", itoa(noNetwork, tmp, 10));
+    replaceString(newAvalilableNetwork, "<number/>", itoa(++noNetwork, tmp, 10));
     replaceString(newAvalilableNetwork, "<ssid/>", ssid);
     replaceString(newAvalilableNetwork, "<encryption/>", GetEncryptionType(encryption));
     replaceString(newAvalilableNetwork, "<strength/>", itoa(strength, tmp, 10));
@@ -116,33 +118,15 @@ void HTMLHandler::addAvailableNetwork(const string &ssid, const uint8 encryption
 string HTMLHandler::getWifiPage() {
     if (!spiffsStarted)
         return internalError;
-    string wifiPage;
-    File wifiPageFile = SPIFFS.open("/WifiPage.html", "r");
-    if (wifiPageFile.isFile() && wifiPageFile.size() > 0) {
-        wifiPage = wifiPageFile.readString().c_str();
-        wifiPageFile.close();
-        Serial.printf("Wifi-File Read\n");
-    } else {
-        wifiPage = internalError;
-    }
+
+    const char *path = "/WifiPage.html";
+    string wifiPage = getStaticPage(path);
     replaceString(wifiPage, "<configuredNetworks/>", registeredNetwork);
     replaceString(wifiPage, "<availableNetworks/>", availableNetworks);
-    replaceString(wifiPage, "<networkOtions/>", options);
+    replaceString(wifiPage, "<networkOptions/>", options);
     replaceString(wifiPage, "<softapssid>", softAP_SSID);
-    replaceString(wifiPage, "<softappassword>", softAP_SSID);
+    replaceString(wifiPage, "<softappassword>", softAP_password);
     return wifiPage;
-}
-
-HTMLHandler::HTMLHandler() : noNetwork(0), options("<option value=''>No WiFiNetwork</option>") {
-    fs::SPIFFSConfig cfg;
-    cfg.setAutoFormat(false);
-    SPIFFS.setConfig(cfg);
-    spiffsStarted = SPIFFS.begin();
-    Serial.printf("SPIFFS started: '%i'\n", spiffsStarted);
-}
-
-HTMLHandler::~HTMLHandler() {
-    SPIFFS.end();
 }
 
 void HTMLHandler::resetWifiPage() {
@@ -156,15 +140,9 @@ void HTMLHandler::resetWifiPage() {
 string HTMLHandler::getSwitch(bool open) {
     if (!spiffsStarted)
         return internalError;
-    string valvepage;
-    File valvePageFile = SPIFFS.open("/Valve.html", "r");
-    if (valvePageFile.isFile() && valvePageFile.size() > 0) {
-        valvepage = valvePageFile.readString().c_str();
-        valvePageFile.close();
-        Serial.printf("Valve-File Read\n");
-    } else {
-        valvepage = internalError;
-    }
+
+    const char *path = "/Valve.html";
+    string valvepage = getStaticPage(path);
     if (open) {
         replaceString(valvepage, "&#x274C; The valve is closed", "&#x274E; The valve is open");
     }
@@ -180,7 +158,8 @@ void HTMLHandler::replaceString(string &original, const string &toReplace, const
     }
 }
 
-void HTMLHandler::setSoftAPCredentials(const string &ssid) {
+void HTMLHandler::setSoftAPCredentials(const string &ssid, const string &password) {
     softAP_SSID = ssid;
+    softAP_password = password;
 }
 
