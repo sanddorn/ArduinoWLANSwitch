@@ -2,4 +2,4 @@
 ## Links:
 * Home
 * [Coverage Data](/coverage)
-* Source Code 'https://github.com/sanddorn/ArduinoWLANSwitch'
+* [Source Code](https://github.com/sanddorn/ArduinoWLANSwitch)
