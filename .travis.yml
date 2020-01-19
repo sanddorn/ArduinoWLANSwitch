@@ -16,7 +16,7 @@ script:
 - gcovr --html-details --exclude .pio --exclude test --output docs/coverage/coverage.html
 deploy:
   exclude:
-    - if: commit_message ~= /^Deploy sanddorn/ArduinoWLANSwitch to github.com.*$/
+    - if: commit_messager ~= /^Deploy sanddorn/ArduinoWLANSwitch to github.com.*$/
   provider: pages
   skip_cleanup: true
   github_token: $GITHUB_TOKEN  # Set in the settings page of your repository, as a secure variable
