@@ -1,22 +1,26 @@
 language: python
 python:
-- '3.6'
+  - '3.6'
 sudo: false
 cache:
   directories:
-  - "~/.platformio"
+    - "~/.platformio"
+
+# require the branch name to be master (note for PRs this is the base branch name)
+if: commit_message !~ /^Deploy sanddorn.ArduinoWLANSwitch to github.com.*$/
+
 install:
 - pip install -U platformio
 - pip install gcovr
 - platformio update
+
 script:
 - platformio run
 - platformio test -e coverage -v
 - mkdir -p docs/coverage
 - gcovr --html-details --exclude .pio --exclude test --output docs/coverage/coverage.html
+
 deploy:
-  exclude:
-    - if: commit_message ~= /^Deploy sanddorn/ArduinoWLANSwitch to github.com.*$/
   provider: pages
   skip_cleanup: true
   github_token: $GITHUB_TOKEN  # Set in the settings page of your repository, as a secure variable
@@ -25,6 +29,7 @@ deploy:
   allow_empty_commit: true
   on:
     branch: master
+
 notifications:
   slack:
     on_error: always
