@@ -15,12 +15,14 @@ script:
 - mkdir -p docs/coverage
 - gcovr --html-details --exclude .pio --exclude test --output docs/coverage/coverage.html
 deploy:
+  exclude:
+    - if: commit_message ~= /^Deploy sanddorn/ArduinoWLANSwitch to github.com.*$/
   provider: pages
   skip_cleanup: true
   github_token: $GITHUB_TOKEN  # Set in the settings page of your repository, as a secure variable
   keep_history: true
-  allow_empty_commit: true
   target_branch: master
+  allow_empty_commit: true
   on:
     branch: master
 notifications:
