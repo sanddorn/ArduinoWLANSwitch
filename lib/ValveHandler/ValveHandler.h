@@ -6,34 +6,19 @@
 #define ARDUINOWLANSWITCH_VALVEHANDLER_H
 
 #include <string>
-
-enum VALVESTATE {
-    UNKNOWN,
-    OPENING,
-    OPEN,
-    CLOSING,
-    CLOSED
-} ;
-
+#define VALVE_OPEN 0
+#define VALVE_CLOSED 1
 using namespace std;
-
 class ValveHandler {
 public:
-    ValveHandler(uint8_t valveOpemPin, uint8_t valveClosePin);
-
-    void openValve(unsigned long now);
-
-    void closeValve(unsigned long now);
-
-    VALVESTATE getStatus();
-
-    unsigned long getMillisWhenLastChange();
-
+    ValveHandler(uint8_t valvePin);
+    void openValve();
+    void closeValve();
+    unsigned char getStatus();
 private:
-    uint8_t valveOpenPin;
-    uint8_t valveClosePin;
-    unsigned long lastChange;
-    VALVESTATE valveState = UNKNOWN;
+    uint8_t valvePin;
+    void switchValve();
+    unsigned char valveState = VALVE_CLOSED;
 
 
 };
