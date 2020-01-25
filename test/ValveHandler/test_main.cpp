@@ -5,8 +5,7 @@
 #include <Arduino.h>
 #include <cstdlib>
 #include <unity.h>
-
-#include "test_WifiConfig.h"
+#include "test_ValveHandler.h"
 
 #ifdef UNIT_TEST
 
@@ -26,7 +25,7 @@ int main(int argc, char **argv)
 {
     UNITY_BEGIN();
 
-    RUN_TEST_GROUP(TestWifiConfig);
+    RUN_TEST_GROUP(TestValveHandler);
 
     UNITY_END();
 

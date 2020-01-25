@@ -2,6 +2,7 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <DNSServer.h>
+#include <Ticker.h>
 #include <ArduinoLog.h>
 #include "WifiConfigStorage.h"
 #include "FS_Persistence.h"
@@ -10,9 +11,11 @@
 #include <FS.h>
 #include "ValveHandler.h"
 #include "EEPROMWifiStorage.h"
+#include "TimedCallbackHandler.h"
 
 
-#define VALVE_PORT 13
+#define VALVE_OPEN_PORT 13
+#define VALVE_CLOSE_PORT 14
 #define TRIGGER_PORT D5
 
 
@@ -25,11 +28,11 @@ const byte DNS_PORT = 53;
 
 DNSServer dnsServer;
 
-Logging logging;
+Logging logging_Storage;
+Logging logging_Valve;
 
 HTMLHandler *htmlHandler;
-
-ValveHandler valveHandler(VALVE_PORT);
+ValveHandler valveHandler(VALVE_OPEN_PORT, VALVE_CLOSE_PORT, TimedCallbackHandler::getInstance(), logging_Valve);
 
 WifiConfigStorage *storage;
 EEPROMWifiStorage eepromStorage;
@@ -80,14 +83,16 @@ typedef struct _wifi_info {
 WIFI_INFO *available_networks;
 
 
-void sendCR(Print * p) {
+void sendCR(Print *p) {
     p->print(CR);
 }
 
 void setup() {
-    pinMode(VALVE_PORT, OUTPUT);
+    pinMode(VALVE_OPEN_PORT, OUTPUT);
+    pinMode(VALVE_CLOSE_PORT, OUTPUT);
     pinMode(TRIGGER_PORT, INPUT);
-    digitalWrite(VALVE_PORT, LOW);
+    digitalWrite(VALVE_OPEN_PORT, LOW);
+    digitalWrite(VALVE_CLOSE_PORT, LOW);
     Serial.begin(115200);
     Serial.println("booting");
     isSoftAP = false;
@@ -97,12 +102,18 @@ void setup() {
     SPIFFS.setConfig(cfg);
     auto *persistence = new FS_Persistence(&SPIFFS);
 
-    logging.begin(LOG_LEVEL_VERBOSE, &Serial);
-    logging.setSuffix(sendCR);
-    htmlHandler = new HTMLHandler(persistence, &logging);
-    storage = new WifiConfigStorage(&logging, &eepromStorage);
+    logging_Storage.begin(LOG_LEVEL_VERBOSE, &Serial);
+    logging_Storage.setSuffix(sendCR);
+    logging_Storage.setPrefix([](Print *p){p->print("STORAGE: ");});
+
+    logging_Valve.begin(LOG_LEVEL_TRACE, &Serial);
+    logging_Valve.setSuffix(sendCR);
+    logging_Valve.setPrefix([](Print *p){p->print("VALVE: ");});
+
+    htmlHandler = new HTMLHandler(persistence, &logging_Storage);
+    storage = new WifiConfigStorage(&logging_Storage, &eepromStorage);
     storage->initStorage();
-//    storage->resetStorage();
+    //storage->resetStorage();
     WiFi.hostname(ESPHostname); // Set the DHCP hostname assigned to ESP station.
     Serial.setDebugOutput(true); //Debug Output for WLAN on Serial Interface.
     available_networks = nullptr;
@@ -138,6 +149,7 @@ void startWifi() {
     WiFi.softAPdisconnect(true);
 
     Serial.println("AP Mode");
+    WiFi.begin();
     CreateWifiSoftAP();
     WiFi.scanDelete();
     WiFi.scanNetworksAsync(scan_completed);;
@@ -169,10 +181,10 @@ void CreateWifiSoftAP() {
     WifiStorage softAP = storage->getSoftAPData();
     Serial.print("SoftAP ");
     Serial.printf("SoftAP Settings: '%s' Passwd: '%s'\n", softAP.AccessPointName, softAP.AccessPointPassword);
+    WiFi.enableAP(true);
     WiFi.softAPConfig(apIP, apIP, netMsk);
     bool SoftAccOK = WiFi.softAP(softAP.AccessPointName,
                                  softAP.AccessPointPassword); // Passwortlänge mindestens 8 Zeichen !
-    delay(600); // Without delay I've seen the IP address blank
     if (SoftAccOK) {
         Serial.println("SoftAP: OK");
         /* Setup the DNS server redirecting all the domains to the apIP */
@@ -183,6 +195,7 @@ void CreateWifiSoftAP() {
     } else {
         Serial.println("Softap: err");
     }
+    Serial.printf("Wifi Addr: %s\n", WiFi.localIP().toString().c_str());
     WiFi.scanDelete();
     WiFi.scanNetworksAsync(scan_completed);
 }
@@ -195,7 +208,6 @@ void set_disconnected(const WiFiEventStationModeDisconnected &wiFiEventStationMo
 bool connect_to_wifi(WifiStorage *wifiStorage) {
     Serial.printf("connect_to_wifi\n");
     WiFi.softAPdisconnect(false);
-    isSoftAP = false;
     Serial.printf("stopped SoftAP, Starting Associate with network: %s:%s\n", wifiStorage->AccessPointName,
                   wifiStorage->AccessPointPassword);
     WiFi.begin(wifiStorage->AccessPointName, wifiStorage->AccessPointPassword);
@@ -265,7 +277,8 @@ void handleWifi() {
         htmlHandler->addAvailableNetwork(network->ssid, network->encryption, network->encryption);
         network++;
     }
-    htmlHandler->setSoftAPCredentials(storage->getSoftAPData().AccessPointName, storage->getSoftAPData().AccessPointPassword);
+    htmlHandler->setSoftAPCredentials(storage->getSoftAPData().AccessPointName,
+                                      storage->getSoftAPData().AccessPointPassword);
     String webPage = htmlHandler->getWifiPage().c_str();
     htmlHandler->resetWifiPage();
     server.setContentLength(webPage.length());
@@ -332,10 +345,12 @@ void handleFactoryReset() {
 }
 
 void handleOpenValve() {
+    Serial.println("handleOpenValve start");
     String page = htmlHandler->getSwitch(true).c_str();
     server.setContentLength(page.length());
     server.send(200, MEDIATYPE_TEXT_HTML, page);
     valveHandler.openValve();
+    Serial.println("handleOpenValve stop");
 }
 
 void handleCloseValve() {
@@ -346,7 +361,7 @@ void handleCloseValve() {
 }
 
 void handleValveStatus() {
-    String page = htmlHandler->getSwitch(valveHandler.getStatus() == VALVE_OPEN).c_str();
+    String page = htmlHandler->getSwitch(valveHandler.getStatus() == VALVESTATE::OPEN).c_str();
     server.setContentLength(page.length());
     server.send(200, MEDIATYPE_TEXT_HTML, page);
 }
@@ -372,26 +387,30 @@ void loop() {
     ArduinoOTA.handle();
     checkTrigger();
     WIFI_INFO *network = available_networks;
-    while (!isAPAccociated && network != nullptr && network->ssid != nullptr) {
-        Serial.printf("Checking for known networks\n");
-        Serial.printf("Checking for ssid: %s\n", network->ssid);
-        WifiStorage *wifi = storage->retrieveNetwork(network->ssid);
+    if (storage->getNumberOfKnownNetworks() > 0) {
+        while (!isAPAccociated && network != nullptr && network->ssid != nullptr) {
+            Serial.printf("Checking for known networks\n");
+            Serial.printf("Checking for ssid: %s\n", network->ssid);
+            WifiStorage *wifi = storage->retrieveNetwork(network->ssid);
 
-        if (wifi != nullptr) {
-            if (connect_to_wifi(wifi)) {
-                isAPAccociated = true;
-                isSoftAP = false;
-                Serial.printf("Connection to AP succeedd: %s\n", wifi->AccessPointName);
+            if (wifi != nullptr) {
+                if (connect_to_wifi(wifi)) {
+                    isAPAccociated = true;
+                    isSoftAP = false;
+                    WiFi.enableAP(false);
+                    Serial.printf("Connection to AP succeedd: %s\n", wifi->AccessPointName);
+                }
             }
+            network++;
         }
-        network++;
+        if (!isAPAccociated) {
+            WiFi.scanDelete();
+            WiFi.scanNetworksAsync(scan_completed);
+        }
     }
-    if (!isAPAccociated) {
-        Serial.printf("No AP Connection could be used\n");
-        WiFi.scanDelete();
-        WiFi.scanNetworksAsync(scan_completed);
-    }
+
     if (!isAPAccociated && !isSoftAP) {
+        Serial.printf("Creating Softap\n");
         CreateWifiSoftAP();
     }
 

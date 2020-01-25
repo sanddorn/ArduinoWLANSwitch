@@ -86,4 +86,4 @@ add_custom_target(
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-add_executable(Z_DUMMY_TARGET ${SRC_LIST} lib/WifiConfig/AbstractWifiStorage.h lib/WifiConfig/EEPROMWifiStorage.cpp lib/WifiConfig/EEPROMWifiStorage.h test/WifiConfig/test_WifiConfig.cpp test/WifiConfig/test_WifiConfig.h)
+add_executable(Z_DUMMY_TARGET ${SRC_LIST})

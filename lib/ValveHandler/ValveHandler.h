@@ -6,21 +6,41 @@
 #define ARDUINOWLANSWITCH_VALVEHANDLER_H
 
 #include <string>
-#define VALVE_OPEN 0
-#define VALVE_CLOSED 1
+#include <memory>
+#include <AbstractCallbackHandler.h>
+#include <ArduinoLog.h>
+
+enum class VALVESTATE {
+    UNKNOWN,
+    OPENING,
+    OPEN,
+    CLOSING,
+    CLOSED
+} ;
+
 using namespace std;
+
 class ValveHandler {
 public:
-    ValveHandler(uint8_t valvePin);
+    ValveHandler(uint8_t valveOpemPin, uint8_t valveClosePin, std::shared_ptr<AbstractCallBackHandler> callbackHandler, Logging &logging);
+
     void openValve();
+
     void closeValve();
-    unsigned char getStatus();
+
+    void callBack();
+
+    VALVESTATE getStatus();
+
+    static void callbackMethod(void * instance);
+
 private:
-    uint8_t valvePin;
-    void switchValve();
-    unsigned char valveState = VALVE_CLOSED;
-
-
+    uint8_t valveOpenPin;
+    uint8_t valveClosePin;
+    unsigned long lastChange;
+    std::shared_ptr<AbstractCallBackHandler> callbackHandler;
+    VALVESTATE valveState = VALVESTATE::UNKNOWN;
+    Logging &logging;
 };
 
 
