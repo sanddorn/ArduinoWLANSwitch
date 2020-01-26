@@ -15,8 +15,9 @@
 
 
 #define VALVE_OPEN_PORT 13
-#define VALVE_CLOSE_PORT 14
-#define TRIGGER_PORT D5
+#define VALVE_CLOSE_PORT 15
+#define TRIGGER_OPEN_PORT 2
+#define TRIGGER_CLOSE_PORT 14
 
 
 int lastTriggerState = LOW;
@@ -90,7 +91,8 @@ void sendCR(Print *p) {
 void setup() {
     pinMode(VALVE_OPEN_PORT, OUTPUT);
     pinMode(VALVE_CLOSE_PORT, OUTPUT);
-    pinMode(TRIGGER_PORT, INPUT);
+    pinMode(TRIGGER_OPEN_PORT, INPUT);
+    pinMode(TRIGGER_CLOSE_PORT, INPUT);
     digitalWrite(VALVE_OPEN_PORT, LOW);
     digitalWrite(VALVE_CLOSE_PORT, LOW);
     Serial.begin(115200);
@@ -104,11 +106,11 @@ void setup() {
 
     logging_Storage.begin(LOG_LEVEL_VERBOSE, &Serial);
     logging_Storage.setSuffix(sendCR);
-    logging_Storage.setPrefix([](Print *p){p->print("STORAGE: ");});
+    logging_Storage.setPrefix([](Print *p) { p->print("STORAGE: "); });
 
     logging_Valve.begin(LOG_LEVEL_TRACE, &Serial);
     logging_Valve.setSuffix(sendCR);
-    logging_Valve.setPrefix([](Print *p){p->print("VALVE: ");});
+    logging_Valve.setPrefix([](Print *p) { p->print("VALVE: "); });
 
     htmlHandler = new HTMLHandler(persistence, &logging_Storage);
     storage = new WifiConfigStorage(&logging_Storage, &eepromStorage);
@@ -367,14 +369,21 @@ void handleValveStatus() {
 }
 
 void checkTrigger() {
-    int triggerSetting = digitalRead(TRIGGER_PORT);
-    // Trigger was used
-    if (triggerSetting != lastTriggerState) {
-        if (triggerSetting == HIGH) {
-            valveHandler.openValve();
-        } else {
-            valveHandler.closeValve();
-        }
+    int triggerOpenSetting = digitalRead(TRIGGER_OPEN_PORT);
+    int triggerCloseSetting = digitalRead(TRIGGER_CLOSE_PORT);
+    if (triggerOpenSetting == triggerCloseSetting) {
+        return;
+    }
+    if (triggerOpenSetting == HIGH &&
+        (valveHandler.getStatus() != VALVESTATE::OPEN && valveHandler.getStatus() != VALVESTATE::OPENING)) {
+        Serial.printf("Trigger Opening Valve: %d\n", valveHandler.getStatus());
+        valveHandler.openValve();
+    }
+    if (triggerCloseSetting == HIGH &&
+        (valveHandler.getStatus() != VALVESTATE::CLOSED && valveHandler.getStatus() != VALVESTATE::CLOSING)) {
+        Serial.printf("Trigger Closing Valve: %d\n", valveHandler.getStatus());
+
+        valveHandler.closeValve();
     }
 }
 

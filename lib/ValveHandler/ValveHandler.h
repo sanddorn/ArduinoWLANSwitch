@@ -39,7 +39,7 @@ private:
     uint8_t valveClosePin;
     unsigned long lastChange;
     std::shared_ptr<AbstractCallBackHandler> callbackHandler;
-    VALVESTATE valveState = VALVESTATE::UNKNOWN;
+    VALVESTATE valveState;
     Logging &logging;
 };
 

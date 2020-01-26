@@ -11,6 +11,14 @@ static const long switchTime = 5000;
 
 void ValveHandler::openValve() {
     logging.trace("openValve start");
+    if (valveState == VALVESTATE::OPENING || valveState == VALVESTATE::OPEN) {
+        logging.trace("openValve stop -- not changing state");
+        return;
+    }
+    if (valveState == VALVESTATE::CLOSING) {
+        logging.trace("openValve: stopping close of valve");
+        digitalWrite(valveClosePin, LOW);
+    }
     valveState = VALVESTATE::OPENING;
     digitalWrite(valveOpenPin, HIGH);
     callbackHandler->startCallbackTimer(switchTime, ValveHandler::callbackMethod, this);
@@ -18,6 +26,14 @@ void ValveHandler::openValve() {
 }
 
 void ValveHandler::closeValve() {
+    if (valveState == VALVESTATE::CLOSING || valveState == VALVESTATE::CLOSED) {
+        logging.trace("closeValve stop -- not changing state");
+        return;
+    }
+    if (valveState == VALVESTATE::OPENING) {
+        logging.trace("closeValve: stopping open of valve");
+        digitalWrite(valveOpenPin, LOW);
+    }
     valveState = VALVESTATE::CLOSING;
     digitalWrite(valveClosePin, HIGH);
     callbackHandler->startCallbackTimer(switchTime, ValveHandler::callbackMethod, this);
@@ -57,6 +73,7 @@ ValveHandler::ValveHandler(uint8_t valueOpenPin, uint8_t valveClosePin,
         valveOpenPin(valueOpenPin),
         valveClosePin(valveClosePin),
         callbackHandler(std::move(callbackHandler)),
-        logging(log) {}
+        logging(log),
+        valveState(VALVESTATE::UNKNOWN){}
 
 
