@@ -14,10 +14,10 @@
 #include "TimedCallbackHandler.h"
 
 
-#define VALVE_OPEN_PORT 13
-#define VALVE_CLOSE_PORT 15
-#define TRIGGER_OPEN_PORT 2
-#define TRIGGER_CLOSE_PORT 14
+#define VALVE_OPEN_PORT D5
+#define VALVE_CLOSE_PORT D6
+#define TRIGGER_OPEN_PORT D2
+#define TRIGGER_CLOSE_PORT D3
 
 
 int lastTriggerState = LOW;
@@ -91,8 +91,8 @@ void sendCR(Print *p) {
 void setup() {
     pinMode(VALVE_OPEN_PORT, OUTPUT);
     pinMode(VALVE_CLOSE_PORT, OUTPUT);
-    pinMode(TRIGGER_OPEN_PORT, INPUT);
-    pinMode(TRIGGER_CLOSE_PORT, INPUT);
+    pinMode(TRIGGER_OPEN_PORT, INPUT_PULLUP);
+    pinMode(TRIGGER_CLOSE_PORT, INPUT_PULLUP);
     digitalWrite(VALVE_OPEN_PORT, LOW);
     digitalWrite(VALVE_CLOSE_PORT, LOW);
     Serial.begin(115200);
@@ -374,12 +374,12 @@ void checkTrigger() {
     if (triggerOpenSetting == triggerCloseSetting) {
         return;
     }
-    if (triggerOpenSetting == HIGH &&
+    if (triggerOpenSetting == LOW &&
         (valveHandler.getStatus() != VALVESTATE::OPEN && valveHandler.getStatus() != VALVESTATE::OPENING)) {
         Serial.printf("Trigger Opening Valve: %d\n", valveHandler.getStatus());
         valveHandler.openValve();
     }
-    if (triggerCloseSetting == HIGH &&
+    if (triggerCloseSetting == LOW &&
         (valveHandler.getStatus() != VALVESTATE::CLOSED && valveHandler.getStatus() != VALVESTATE::CLOSING)) {
         Serial.printf("Trigger Closing Valve: %d\n", valveHandler.getStatus());
 

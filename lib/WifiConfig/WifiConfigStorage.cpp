@@ -51,7 +51,6 @@ void WifiConfigStorage::initStorage() {
     } else {
         log->trace("storate is invalid, generating default.");
         resetStorage();
-        saveToEEPROM();
         storageIsValid = true;
     }
 }
@@ -129,5 +128,6 @@ void WifiConfigStorage::resetStorage() {
     actualData.numberOfNets = 0;
     strncpy(actualData.fallback.AccessPointName, ap_name, ACCESSPOINT_NAME_LENGTH);
     strncpy(actualData.fallback.AccessPointPassword, default_password, WIFI_PASSWORD_LENGTH);
+    saveToEEPROM();
 }
 
