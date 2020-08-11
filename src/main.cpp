@@ -205,6 +205,7 @@ void CreateWifiSoftAP() {
 void set_disconnected(const WiFiEventStationModeDisconnected &wiFiEventStationModeDisconnected) {
     Serial.printf("Disconnected from AP %s for reasonNo %i\n", wiFiEventStationModeDisconnected.ssid.c_str(),
                   wiFiEventStationModeDisconnected.reason);
+    CreateWifiSoftAP();
 }
 
 bool connect_to_wifi(WifiStorage *wifiStorage) {
