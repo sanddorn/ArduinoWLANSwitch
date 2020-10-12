@@ -8,10 +8,10 @@
 
 #define MAX_NUMBER_OF_NETS 5
 
-#define WIFI_PASSWORD_LENGTH 25
-#define ACCESSPOINT_NAME_LENGTH 20
+#define WIFI_PASSWORD_LENGTH 63
+#define ACCESSPOINT_NAME_LENGTH 32
 
-static const int storage_size = 512;
+static const int storage_size = 6*(WIFI_PASSWORD_LENGTH+ACCESSPOINT_NAME_LENGTH+2)+3;
 
 typedef struct _WifiStorage {
     char AccessPointName[ACCESSPOINT_NAME_LENGTH];
